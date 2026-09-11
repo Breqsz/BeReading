@@ -104,6 +104,26 @@ export function assertServiceRole(
   }
 }
 
+/**
+ * Guard de função interna que aceita mais de uma credencial.
+ *
+ * BER-69 / BER-33: o pg_cron não usa a chave que as functions recebem — a
+ * `SUPABASE_SERVICE_ROLE_KEY` injetada é outra, não o JWT service_role legado que
+ * estava gravado em texto puro no cron. O retry aceita também um `CRON_SECRET`
+ * próprio, que o cron lê do Vault. Slot vazio ou indefinido nunca vale: falha
+ * fechada, como `assertServiceRole`.
+ *
+ * @throws AuthError 401
+ */
+export function assertInternalCaller(
+  authHeader: string | null | undefined,
+  acceptedKeys: ReadonlyArray<string | null | undefined>,
+): void {
+  if (!acceptedKeys.some((key) => isServiceRole(authHeader, key))) {
+    throw new AuthError(401, 'Service role required');
+  }
+}
+
 /** Resposta padrão para um AuthError (ou 500 se o erro não for de auth). */
 export function authErrorResponse(err: unknown): Response {
   const status = err instanceof AuthError ? err.status : 500;

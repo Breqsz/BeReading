@@ -7,7 +7,8 @@
 // agendamento do pg_cron — que só se conserta com migration, hoje inaplicável
 // (BER-31). Melhor um nome apertado do que um cron que para de rodar.
 import { createServiceClient } from '../_shared/supabase-client.ts';
-import { assertServiceRole, authErrorResponse } from '../_shared/auth.ts';
+import { assertInternalCaller, authErrorResponse } from '../_shared/auth.ts';
+import { acceptedCallerKeys } from './callers.ts';
 import { buildPendingFilter } from './filter.ts';
 import {
   buildStaleEvaluationFilter,
@@ -119,11 +120,12 @@ async function retryPendingEvaluations(
 }
 
 Deno.serve(async (req) => {
-  // Função interna: só o pg_cron (que manda a service_role key) entra. Ver BER-30.
+  // Função interna (BER-30): entra o pg_cron, com o CRON_SECRET que lê do Vault, ou
+  // quem tiver a service_role. Ver callers.ts (BER-69 / BER-33).
   try {
-    assertServiceRole(
+    assertInternalCaller(
       req.headers.get('Authorization'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      acceptedCallerKeys((name) => Deno.env.get(name)),
     );
   } catch (err) {
     return authErrorResponse(err);

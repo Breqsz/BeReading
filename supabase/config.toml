@@ -393,16 +393,22 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # perdido a cada deploy manual (BER-50). Declarado aqui, a configuração vem junto com
 # o código e o `supabase functions deploy` a respeita.
 #
-# Regra: quem é chamado pelo APP verifica o JWT do usuário; quem é chamado por outra
-# function ou pelo pg_cron não tem JWT de usuário nenhum e valida a service_role key
-# dentro do handler (`_shared/auth.ts`).
+# Regra: a autenticação mora no HANDLER (`_shared/auth.ts`), não no gateway.
+#   - chamada pelo app: `resolveUserId` valida o JWT do usuário no Auth;
+#   - chamada interna (outra function, pg_cron): `assertServiceRole` / `assertInternalCaller`.
+#
+# BER-69: `verify_jwt` fica false TAMBÉM nas funções do app. O projeto assina login
+# com ES256, e o gateway tem bug conhecido recusando ES256 válido com 401
+# (supabase/supabase#42244). Ligar `true` sem testar com login real derruba o
+# registro de leitura e a avaliação. A trava do handler funciona com qualquer
+# algoritmo de assinatura. Religar só depois de testar com um usuário de verdade.
 
-# --- Chamadas pelo app (identidade do usuário) ---
+# --- Chamadas pelo app (identidade do usuário, validada no handler) ---
 [functions.register-reading-session]
-verify_jwt = true
+verify_jwt = false
 
 [functions.evaluate-answer]
-verify_jwt = true
+verify_jwt = false
 
 # --- Internas (service_role; o guard está no handler) ---
 [functions.generate-questions]

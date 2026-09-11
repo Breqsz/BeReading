@@ -6,6 +6,7 @@ import {
   assertThrows,
 } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import {
+  assertInternalCaller,
   assertServiceRole,
   AuthError,
   extractBearer,
@@ -135,4 +136,31 @@ Deno.test('isServiceRole: falha fechada — sem env configurada, ninguém é int
 
 Deno.test('isServiceRole: um JWT de usuário não passa por interno', () => {
   assertEquals(isServiceRole('Bearer jwt.de.usuario', 'service-role-key'), false);
+});
+
+// --- BER-69 / BER-33: assertInternalCaller, mais de uma credencial interna ---
+
+Deno.test('assertInternalCaller: aceita qualquer uma das chaves configuradas', () => {
+  assertInternalCaller('Bearer service-key', ['service-key', 'cron-secret']);
+  assertInternalCaller('Bearer cron-secret', ['service-key', 'cron-secret']);
+});
+
+Deno.test('assertInternalCaller: recusa chave fora da lista', () => {
+  const err = assertThrows(
+    () => assertInternalCaller('Bearer anon-key', ['service-key', 'cron-secret']),
+    AuthError,
+  );
+  assertEquals(err.status, 401);
+});
+
+Deno.test('assertInternalCaller: falha FECHADA quando nenhuma chave está configurada', () => {
+  // O CRON_SECRET é opcional no deploy: sem ele a lista vira [srk, undefined], e
+  // um slot vazio nunca pode virar porta aberta.
+  assertThrows(() => assertInternalCaller('Bearer qualquer', [undefined, '']), AuthError);
+  assertThrows(() => assertInternalCaller('Bearer qualquer', [null]), AuthError);
+  assertThrows(() => assertInternalCaller('Bearer qualquer', []), AuthError);
+});
+
+Deno.test('assertInternalCaller: recusa header ausente mesmo com chaves configuradas', () => {
+  assertThrows(() => assertInternalCaller(null, ['service-key', 'cron-secret']), AuthError);
 });

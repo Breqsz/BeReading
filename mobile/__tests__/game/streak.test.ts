@@ -91,4 +91,16 @@ describe('streakRisk', () => {
   it('não avisa com sequência menor que 2 — não há o que perder', () => {
     expect(streakRisk({ streak: 1, readToday: false, now: spNoite }).atRisk).toBe(false);
   });
+
+  // Fronteira exata da regra (hora >= 18): os testes acima usam 21h e 16h,
+  // nenhum encosta no corte. 17h59 e 18h00 em São Paulo provam o >= certo.
+  it('não avisa às 17h59 de SP, um minuto antes do corte', () => {
+    const antesDoCorte = new Date('2026-09-11T20:59:00.000Z'); // 17h59 em SP
+    expect(streakRisk({ streak: 4, readToday: false, now: antesDoCorte }).atRisk).toBe(false);
+  });
+
+  it('avisa exatamente às 18h00 de SP, no corte', () => {
+    const noCorte = new Date('2026-09-11T21:00:00.000Z'); // 18h00 em SP
+    expect(streakRisk({ streak: 4, readToday: false, now: noCorte }).atRisk).toBe(true);
+  });
 });

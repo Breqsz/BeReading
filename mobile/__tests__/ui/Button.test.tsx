@@ -5,11 +5,37 @@ import { Button } from '../../src/ui/Button';
 import { IconButton } from '../../src/ui/IconButton';
 import { color, MIN_TOUCH } from '../../src/theme/tokens';
 
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn(() => Promise.resolve()),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+}));
+
+import * as Haptics from 'expo-haptics';
+
 // Espiao em vez do icone real do lucide: evita o transform do pacote e
 // deixa a cor recebida visivel como texto, pronta para asserir.
 const IconSpy = ({ color: c }: { color: string }) => <RNText>{c}</RNText>;
 
 describe('Button', () => {
+  beforeEach(() => {
+    (Haptics.impactAsync as jest.Mock).mockClear();
+  });
+
+  // fireEvent.press NAO dispara onPressIn (so onPress): sem este teste, o
+  // handler inteiro de haptic podia ser apagado do Button que nenhuma suite
+  // acusava.
+  it('dispara haptic no pressIn', () => {
+    const { getByRole } = render(<Button onPress={jest.fn()}>Registrar</Button>);
+    fireEvent(getByRole('button'), 'pressIn');
+    expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Medium);
+  });
+
+  it('nao dispara haptic no pressIn quando desabilitado', () => {
+    const { getByRole } = render(<Button onPress={jest.fn()} disabled>Registrar</Button>);
+    fireEvent(getByRole('button'), 'pressIn');
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+
   it('chama onPress no toque', () => {
     const onPress = jest.fn();
     const { getByRole } = render(<Button onPress={onPress}>Registrar leitura</Button>);
@@ -112,5 +138,30 @@ describe('IconButton', () => {
     const s = StyleSheet.flatten(getByRole('button').props.style);
     expect(s.width).toBeGreaterThanOrEqual(MIN_TOUCH);
     expect(s.height).toBeGreaterThanOrEqual(MIN_TOUCH);
+  });
+
+  it('dispara onPress quando habilitado', () => {
+    const onPress = jest.fn();
+    const { getByRole } = render(
+      <IconButton icon={X} accessibilityLabel="Enviar" onPress={onPress} />,
+    );
+    fireEvent.press(getByRole('button'));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('nao dispara onPress quando desabilitado (composer sem texto, spec 7.5)', () => {
+    const onPress = jest.fn();
+    const { getByRole } = render(
+      <IconButton icon={X} accessibilityLabel="Enviar" onPress={onPress} disabled />,
+    );
+    fireEvent.press(getByRole('button'));
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('anuncia o estado desabilitado para o leitor de tela', () => {
+    const { getByRole } = render(
+      <IconButton icon={X} accessibilityLabel="Enviar" onPress={jest.fn()} disabled />,
+    );
+    expect(getByRole('button').props.accessibilityState.disabled).toBe(true);
   });
 });

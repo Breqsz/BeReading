@@ -25,7 +25,8 @@ jest.mock('@expo-google-fonts/hanken-grotesk', () => ({
 }));
 
 import { fontFamily } from '../../src/theme/tokens';
-import { APP_FONT_MAP } from '../../src/theme/fonts';
+import { APP_FONT_MAP, useAppFonts } from '../../src/theme/fonts';
+import { useFonts as useNewsreaderMock } from '@expo-google-fonts/newsreader';
 
 describe('fontes do app', () => {
   it('toda família citada nos tokens está no mapa de carga', () => {
@@ -40,5 +41,24 @@ describe('fontes do app', () => {
     for (const chave of Object.keys(APP_FONT_MAP)) {
       expect(usadas.has(chave)).toBe(true);
     }
+  });
+});
+
+describe('useAppFonts', () => {
+  afterEach(() => {
+    (useNewsreaderMock as jest.Mock).mockReset();
+  });
+
+  it('libera a splash quando a fonte carrega normalmente', () => {
+    (useNewsreaderMock as jest.Mock).mockReturnValue([true, null]);
+    expect(useAppFonts()).toBe(true);
+  });
+
+  it('nao trava para sempre quando a carga da fonte falha: degrada para o fallback do sistema', () => {
+    // Sem a correção (descartar o segundo elemento do hook), `loaded` fica
+    // `false` para sempre aqui e useAppFonts devolveria `false` — a splash
+    // nunca sai. Ver Tarefa da rodada de correção da F2.
+    (useNewsreaderMock as jest.Mock).mockReturnValue([false, new Error('falha ao baixar a fonte')]);
+    expect(useAppFonts()).toBe(true);
   });
 });

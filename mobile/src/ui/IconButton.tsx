@@ -9,23 +9,30 @@ interface Props {
   accessibilityLabel: string;
   onPress: () => void;
   variant?: 'surface' | 'ghost';
+  disabled?: boolean;
   style?: ViewStyle;
 }
 
-export function IconButton({ icon: Icon, accessibilityLabel, onPress, variant = 'surface', style }: Props) {
+// Mesmo padrao do Button: desabilitado nao usa opacidade, so troca a cor do
+// icone para o token de texto apagado (text3) e bloqueia o toque.
+export function IconButton({
+  icon: Icon, accessibilityLabel, onPress, variant = 'surface', disabled = false, style,
+}: Props) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
+      accessibilityState={{ disabled }}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.base,
         variant === 'surface' ? styles.surface : null,
-        pressed ? { backgroundColor: color.surface3 } : null,
+        pressed && !disabled ? { backgroundColor: color.surface3 } : null,
         style,
       ]}
     >
-      <Icon size={20} color={color.text} strokeWidth={2} />
+      <Icon size={20} color={disabled ? color.text3 : color.text} strokeWidth={2} />
     </Pressable>
   );
 }

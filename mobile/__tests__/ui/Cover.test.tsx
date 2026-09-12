@@ -58,4 +58,19 @@ describe('Cover', () => {
     const { queryByText } = render(<Cover book={livro} size="xs" />);
     expect(queryByText('Douglas Adams')).toBeNull();
   });
+
+  it('width tem precedencia sobre size, para os tamanhos que a spec pede (52, 86, 100)', () => {
+    const { getByTestId } = render(<Cover book={livro} size="lg" width={86} />);
+    const flat = StyleSheet.flatten(getByTestId('cover-generated').props.style);
+    expect(flat.width).toBe(86);
+  });
+
+  it('mantem a proporcao 2:3 com width arbitrario', () => {
+    for (const width of [52, 86, 100]) {
+      const { getByTestId } = render(<Cover book={livro} width={width} />);
+      const flat = StyleSheet.flatten(getByTestId('cover-generated').props.style);
+      expect(flat.width).toBe(width);
+      expect(flat.height / flat.width).toBeCloseTo(1.5, 1);
+    }
+  });
 });

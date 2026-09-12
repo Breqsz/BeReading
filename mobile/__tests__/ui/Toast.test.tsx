@@ -65,10 +65,31 @@ describe('Toast', () => {
     expect(queryByText('Segundo')).toBeTruthy();
   });
 
+  it('o segundo toast nao some cedo por causa do timer do primeiro (limpar() dentro do show())', () => {
+    // Sem o limpar() no comeco do show(), o timer do "Primeiro" (criado em
+    // t=0, para disparar em t=4000) continua vivo. Aqui ele mostra o
+    // "Segundo" em t=2000 (novo timer previsto para t=6000) e avanca so ate
+    // t=4000: se o timer velho nao foi cancelado, ele dispara setToast(null)
+    // e apaga o "Segundo" dois segundos antes da hora.
+    const { getByLabelText, queryByText, rerender } = montar({ message: 'Primeiro' });
+    fireEvent.press(getByLabelText('disparar'));
+    act(() => { jest.advanceTimersByTime(2000); });
+    rerender(<ToastProvider><Tela opts={{ message: 'Segundo' }} /></ToastProvider>);
+    fireEvent.press(getByLabelText('disparar'));
+    act(() => { jest.advanceTimersByTime(2000); });
+    expect(queryByText('Segundo')).toBeTruthy();
+  });
+
   it('se anuncia como alerta para o leitor de tela', () => {
     const { getByLabelText, getByRole } = montar({ message: 'Salvo' });
     fireEvent.press(getByLabelText('disparar'));
     expect(getByRole('alert')).toBeTruthy();
+  });
+
+  it('usa live region "polite", sem a qual o TalkBack nao anuncia o alert sozinho', () => {
+    const { getByLabelText, getByRole } = montar({ message: 'Salvo' });
+    fireEvent.press(getByLabelText('disparar'));
+    expect(getByRole('alert').props.accessibilityLiveRegion).toBe('polite');
   });
 
   it('limpa o timer pendente quando desmonta, para nao disparar contra arvore morta', () => {

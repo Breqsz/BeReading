@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
-import { color, elevation, radius, space } from '../theme/tokens';
+import { color, elevation, motion, radius, space } from '../theme/tokens';
 
 export interface ToastOptions {
   message: string;
@@ -67,10 +67,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       {toast ? (
         <Animated.View
-          entering={FadeInDown.duration(240)}
-          exiting={FadeOutDown.duration(160)}
+          // Duracao de tokens.ts, nao literal: eram os mesmos valores de
+          // motion.enter/motion.exit escritos a mao, sem ler o token.
+          entering={FadeInDown.duration(motion.enter.duration)}
+          exiting={FadeOutDown.duration(motion.exit.duration)}
           accessible
           accessibilityRole="alert"
+          // accessibilityRole="alert" sozinho nao dispara anuncio no TalkBack
+          // (Android): so funciona junto de accessibilityLiveRegion="polite",
+          // que e o que de fato aciona a regiao viva. Sem isso, o toast (que
+          // substitui os Alert.alert nativos, esses sim anunciados) fica mudo
+          // para quem usa leitor de tela.
+          accessibilityLiveRegion="polite"
           style={[styles.wrap, elevation.floating, { bottom: insets.bottom + TAB_BAR_CLEARANCE }]}
         >
           <View style={[styles.indicatorHalo, { backgroundColor: TONE_INDICATOR[toast.tone ?? 'info'].halo }]}>

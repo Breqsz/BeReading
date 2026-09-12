@@ -12,7 +12,13 @@ function contrast(a: string, b: string): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
-const SURFACES = [color.bg, color.surface1, color.surface2];
+// As cinco superficies onde texto pousa de verdade, nao so as tres mais
+// obvias: surface3 e "pressed/selecionado" (legenda dentro de linha
+// selecionada e combinacao trivial nas telas) e floating e o toast (onde
+// text3 tambem aparece, no detalhe). Faltar as duas deixou passar text3
+// reprovando AA sobre surface3 (4,295) e apertando sobre floating (4,652)
+// — ver rodada de correcao da F2.
+const SURFACES = [color.bg, color.surface1, color.surface2, color.surface3, color.floating];
 
 describe('tokens · contraste', () => {
   it.each([['text', color.text], ['text2', color.text2], ['text3', color.text3]])(

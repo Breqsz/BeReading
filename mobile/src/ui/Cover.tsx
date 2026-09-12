@@ -11,19 +11,38 @@ type Size = 'xs' | 'sm' | 'md' | 'lg';
 const WIDTH: Record<Size, number> = { xs: 48, sm: 74, md: 108, lg: 160 };
 const TITLE_SIZE: Record<Size, number> = { xs: 0, sm: 11, md: 15, lg: 21 };
 
+/**
+ * As telas pedem capas fora dos quatro tamanhos nomeados (52 na Estante, 86
+ * na Hoje, 100 no detalhe do livro): em vez de outro literal solto, extrai a
+ * razao direto dos dois extremos nao-zero que TITLE_SIZE ja declara (sm e
+ * lg) e projeta a mesma reta para a largura pedida. Reproduz sm e lg exatos
+ * e md a menos de meio pixel — a mesma proporcao, so parametrizada.
+ */
+function tituloProporcional(width: number): number {
+  const inclinacao = (TITLE_SIZE.lg - TITLE_SIZE.sm) / (WIDTH.lg - WIDTH.sm);
+  return TITLE_SIZE.sm + inclinacao * (width - WIDTH.sm);
+}
+
 interface Props {
   book: Pick<Book, 'id' | 'title' | 'author' | 'cover_url'>;
   size?: Size;
+  /**
+   * Largura explicita, com precedencia sobre `size`. Existe porque a spec
+   * pede tamanhos que a tabela xs/sm/md/lg nao cobre (52 na Estante, 86 na
+   * Hoje, 100 no detalhe do livro) — sem isso a primeira tela a usar um
+   * desses tamanhos teria que mudar a API do zero.
+   */
+  width?: number;
   style?: ViewStyle;
 }
 
 // A capa e a midia principal do app. Sem cover_url, o app desenha uma capa de
 // colecao; com cover_url (BER-72), a capa real entra POR CIMA da gerada, que
 // segue atras como placeholder enquanto a imagem baixa.
-export function Cover({ book, size = 'md', style }: Props) {
-  const width = WIDTH[size];
+export function Cover({ book, size = 'md', width: widthProp, style }: Props) {
+  const width = widthProp ?? WIDTH[size];
   const height = Math.round(width * 1.5);
-  const titleSize = TITLE_SIZE[size];
+  const titleSize = widthProp !== undefined ? tituloProporcional(widthProp) : TITLE_SIZE[size];
   const showText = titleSize > 0;
 
   return (

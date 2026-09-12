@@ -49,6 +49,18 @@ describe('Ring', () => {
     );
     expect(getByText('4')).toBeTruthy();
   });
+
+  // thickness padrao e Math.max(3, size * 0.08): sem teste, e a conta que
+  // erra justamente nos tamanhos reais (38, 84, 112, 160 do app).
+  it('a espessura padrao e proporcional ao tamanho (8% do diametro)', () => {
+    const { getByTestId } = render(<Ring progress={0.5} size={100} accessibilityLabel="A" />);
+    expect(getByTestId('ring-progress').props.strokeWidth).toBe(8);
+  });
+
+  it('a espessura padrao respeita o piso de 3 em tamanhos pequenos', () => {
+    const { getByTestId } = render(<Ring progress={0.5} size={20} accessibilityLabel="B" />);
+    expect(getByTestId('ring-progress').props.strokeWidth).toBe(3);
+  });
 });
 
 describe('ProgressBar', () => {

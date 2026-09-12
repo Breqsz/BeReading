@@ -45,6 +45,11 @@ export const APP_FONT_MAP = {
 } as const;
 
 export function useAppFonts(): boolean {
-  const [loaded] = useNewsreader(APP_FONT_MAP);
-  return loaded;
+  // O segundo elemento e o erro da carga. Descarta-lo fazia `loaded` nunca
+  // virar `true` numa falha de rede/CDN, e o `_layout.tsx` retorna `null`
+  // enquanto isso — a splash ficava presa para sempre. Falha de fonte deve
+  // degradar para o fallback do sistema, nao travar o app: por isso o erro
+  // tambem libera a splash.
+  const [loaded, erro] = useNewsreader(APP_FONT_MAP);
+  return loaded || !!erro;
 }

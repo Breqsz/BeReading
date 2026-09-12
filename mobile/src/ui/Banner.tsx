@@ -15,6 +15,9 @@ export function Banner({ tone, message, onRetry }: Props) {
     <View
       accessible
       accessibilityRole="alert"
+      // Mesma razao do Toast: accessibilityRole="alert" sozinho nao e
+      // anunciado no TalkBack, so com accessibilityLiveRegion="polite" junto.
+      accessibilityLiveRegion="polite"
       style={[styles.wrap, tone === 'error' ? styles.error : styles.info]}
     >
       <Text variant="callout" tone={tone === 'error' ? 'danger' : 'secondary'} style={styles.msg}>

@@ -1,6 +1,8 @@
 // Design system do redesign (BER-77) — fonte única de verdade.
 // Contrato legível em mobile/DESIGN.md. Nenhum valor visual existe fora daqui:
-// __tests__/guards barra hex e fontSize soltos em src/ui, src/features e app.
+// __tests__/guards barra hex e fontSize soltos em src/ui, src/assistant e
+// src/game — as pastas que a F2 entregou. app/ e src/features (blocos de
+// tela) ainda não existem em código; entram sob guarda na F4.
 
 export const color = {
   bg: '#12100E',
@@ -14,7 +16,11 @@ export const color = {
 
   text: '#F3EDE2',
   text2: '#B9B0A3',
-  text3: '#978E82',
+  // Era #978E82: reprovava AA (4,5) sobre surface3 (4,295) e apertava sobre
+  // floating (4,652) — as duas superfícies onde legenda/desabilitado convive
+  // com "pressed" e toast. #A0978B passa nas cinco superfícies com folga
+  // (mínimo 4,814); ver __tests__/theme/tokens.test.ts.
+  text3: '#A0978B',
 
   accent: '#F0A83A',
   accentInk: '#1B1206',
@@ -95,6 +101,11 @@ export const motion = {
   stagger: { step: 40, max: 6 },
   count: { duration: 600 },
   skeleton: { duration: 200 },
+  // Pulso do Skeleton (opacidade indo e voltando em loop): duração própria,
+  // diferente de `skeleton` acima, que é o crossfade de 200ms para o
+  // conteúdo real quando o carregamento termina — propósitos distintos, sem
+  // reaproveitar um pelo outro.
+  pulse: { duration: 800 },
 } as const;
 
 export const elevation = {

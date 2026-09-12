@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { StyleSheet, type DimensionValue } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, useReducedMotion } from 'react-native-reanimated';
-import { color, radius } from '../theme/tokens';
+import { color, motion, radius } from '../theme/tokens';
 
 interface Props {
   width: DimensionValue;
@@ -17,7 +17,9 @@ export function Skeleton({ width, height, borderRadius = radius.tag }: Props) {
 
   useEffect(() => {
     if (semMovimento) return;
-    opacity.value = withRepeat(withTiming(1, { duration: 800 }), -1, true);
+    // motion.pulse, nao motion.skeleton: skeleton e o crossfade de 200ms para
+    // o conteudo real ao terminar, um proposito diferente do pulso em loop.
+    opacity.value = withRepeat(withTiming(1, { duration: motion.pulse.duration }), -1, true);
   }, [opacity, semMovimento]);
 
   const animado = useAnimatedStyle(() => ({ opacity: opacity.value }));

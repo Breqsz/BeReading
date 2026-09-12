@@ -17,6 +17,13 @@ const RAIZ = join(__dirname, '..', '..');
 const VIGIADAS = ['src/ui', 'src/assistant', 'src/game'];
 
 /**
+ * Pastas do sistema "Luminous Library" anterior, que ainda nao migraram (saem
+ * na F6). Lista compartilhada pelas tres guardas deste diretorio (a11y, copy
+ * e esta) — ver a checagem inversa no fim do arquivo.
+ */
+const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types', 'src/utils', 'src/theme'];
+
+/**
  * Excecoes nominais, com motivo. Qualquer adicao aqui precisa de justificativa
  * no PR — a lista curta e o que dá valor a guarda.
  *
@@ -101,5 +108,26 @@ describe('guarda: feedback', () => {
   it.each(TODOS)('%s nao usa Alert.alert', (rel) => {
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(codigo).not.toMatch(/Alert\.alert/);
+  });
+});
+
+/**
+ * O buraco que as guardas acima nao cobriam: elas so sabem varrer o que ja
+ * esta em VIGIADAS. Uma pasta nova sob src/ (ninguem lembrou de adicionar
+ * aqui nem em LEGADO) nao acusava nada — nem cor solta, nem fontSize solto,
+ * nem Alert.alert eram barrados nela, e o silencio parecia aprovacao. Esta
+ * checagem inverte o sentido: enumera as pastas REAIS de primeiro nivel de
+ * src/ e falha em qualquer uma que nao esteja nem vigiada nem catalogada
+ * como legado. Pasta nova nasce coberta (alguem decide o balde) ou acusa —
+ * nunca fica muda.
+ */
+describe('guarda: pasta nova nasce coberta ou acusa', () => {
+  it('todo diretorio de primeiro nivel de src/ esta em VIGIADAS ou em LEGADO', () => {
+    const raizSrc = join(RAIZ, 'src');
+    const dirs = readdirSync(raizSrc).filter((nome) => statSync(join(raizSrc, nome)).isDirectory());
+    const conhecidas = new Set([...VIGIADAS, ...LEGADO].map((p) => p.replace('src/', '')));
+    for (const dir of dirs) {
+      expect(conhecidas.has(dir)).toBe(true);
+    }
   });
 });

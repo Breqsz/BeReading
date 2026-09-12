@@ -101,6 +101,10 @@ describe('scoreLine', () => {
     expect(scoreLine(50)).toBe('Quase. Olha esse detalhe que passou.');
   });
 
+  it('faixa 70 a 84 reconhece o esforco, sem chamar de "mandou bem"', () => {
+    expect(scoreLine(75)).toBe('Boa. Faltou pouco pro ponto principal.');
+  });
+
   it('nota muito baixa nao chama de "quase", porque seria mentira', () => {
     expect(scoreLine(10)).toBe('Essa não foi. Vale reler o trecho antes de seguir.');
   });

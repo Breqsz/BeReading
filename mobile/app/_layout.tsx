@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/stores/authStore';
 import { loadOrCreateProfile } from '../src/api/profile';
@@ -97,7 +97,12 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider>
+    // Sem initialMetrics, o SafeAreaProvider da v5 renderiza null ate a
+    // primeira medicao nativa chegar — a View de fundo abaixo fica dentro
+    // dele, entao o primeiro quadro sai em branco: exatamente o flash que a
+    // splash (acima) existe para esconder. initialWindowMetrics preenche a
+    // medida sincronamente, do modulo nativo, antes do primeiro render.
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <View style={{ flex: 1, backgroundColor: color.bg }}>
         <ToastProvider>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />

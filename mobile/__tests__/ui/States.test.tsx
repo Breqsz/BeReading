@@ -98,6 +98,11 @@ describe('Banner', () => {
     expect(getByRole('alert')).toBeTruthy();
   });
 
+  it('usa live region "polite", sem a qual o TalkBack nao anuncia o alert sozinho', () => {
+    const { getByRole } = render(<Banner tone="error" message="Falhou" />);
+    expect(getByRole('alert').props.accessibilityLiveRegion).toBe('polite');
+  });
+
   it('sem onRetry, nao renderiza botao', () => {
     const { queryByRole } = render(<Banner tone="info" message="Só um aviso" />);
     expect(queryByRole('button')).toBeNull();

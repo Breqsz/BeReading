@@ -6,8 +6,11 @@
 
 ## 1. Color
 
-Neutros quentes (tinta e papel) e um acento só. Todo valor de cor em `src/ui`, `src/features` e
-`app` vem de `color` em `src/theme/tokens.ts`. Nada de hex, `rgb()` ou `rgba()` literal fora dele.
+Neutros quentes (tinta e papel) e um acento só. Todo valor de cor em `src/ui`, `src/assistant` e
+`src/game` vem de `color` em `src/theme/tokens.ts` — as pastas que a F2 entregou, varridas por
+`__tests__/guards`. `app/` e `src/features` (blocos de tela) ainda não existem em código; entram
+sob guarda na F4, quando as telas forem migrando. Nada de hex, `rgb()` ou `rgba()` literal fora
+de `tokens.ts` nas pastas vigiadas.
 
 | token | valor | uso |
 |---|---|---|
@@ -20,7 +23,7 @@ Neutros quentes (tinta e papel) e um acento só. Todo valor de cor em `src/ui`, 
 | `color.line2` | `rgba(243,237,226,0.14)` | borda de superfície flutuante |
 | `color.text` | `#F3EDE2` | texto principal |
 | `color.text2` | `#B9B0A3` | texto secundário |
-| `color.text3` | `#978E82` | legenda, desabilitado |
+| `color.text3` | `#A0978B` | legenda, desabilitado |
 | `color.accent` | `#F0A83A` | progresso e ação primária, apenas |
 | `color.accentInk` | `#1B1206` | texto sobre `color.accent` |
 | `color.accentSoft` | `rgba(240,168,58,0.14)` | aviso, chip de XP |
@@ -31,6 +34,12 @@ Neutros quentes (tinta e papel) e um acento só. Todo valor de cor em `src/ui`, 
 
 O acento `color.accent` `#F0A83A` é o único acento do produto. Uma tela não usa uma segunda cor de
 destaque: quando tudo chama atenção, nada chama atenção.
+
+**Âmbar é jogo, neutro é leitura.** O acento marca o progresso da camada de jogo (nível, XP,
+sequência); o neutro (`color.text`) marca o progresso de leitura de um livro (capítulo, sessão).
+Não é contradição o `Ring` (nível) usar `accent` e a `ProgressBar` (capítulo) usar `text`: são
+duas métricas diferentes, e cada uma tem sua cor porque uma tela nunca mistura as duas camadas na
+mesma barra.
 
 **Paleta de capas geradas** (`COVER_PALETTE_COLORS`, oito tons: `#5E2A2A` `#2F4A3A` `#22324F`
 `#7A5A1E` `#4A2F4F` `#1F4A4F` `#3A3F47` `#7A3B22`), escolhida por hash determinístico do `book.id`.
@@ -88,53 +97,60 @@ entre seções de uma tela é `space.xxl`.
 
 ## 5. Components
 
-Os primitivos abaixo ainda não existem em código (Tarefas 9 a 16). Este é o contrato que eles
-cumprem: cada um lista seus estados. Nenhum estado aqui descrito é opcional a implementar; um
-primitivo sem o estado "erro" descrito, por exemplo, ainda entra incompleto.
+Os primitivos abaixo já existem em código, em `src/ui`. Este é o contrato que eles cumprem: cada
+um lista seus estados. Nenhum estado aqui descrito é opcional a implementar; um primitivo sem o
+estado "erro" descrito, por exemplo, ainda entra incompleto.
 
 - **Text**: wrapper de `RNText` por `TypeVariant`. Não tem estado de interação; a única variação é
   a `TypeVariant` e a cor (`color.text`, `color.text2`, `color.text3`, `color.accent`,
   `color.danger`, conforme o contexto).
 - **Button**: ação primária (`color.accent` + `color.accentInk`) e secundária
   (`color.surface2` + `color.text`). Estados: default; pressed (`motion.press`: scale 0,98,
-  escurece); loading (rótulo substituído por indicador, sem mudar a largura); disabled
-  (`color.text3` sobre `color.surface2`, sem interação). `accessibilityRole="button"` e
+  escurece); loading (indicador ao lado do rótulo, que continua visível, sem mudar a largura);
+  disabled (`color.text3` sobre `color.surface2`, sem interação). `accessibilityRole="button"` e
   `accessibilityLabel` sempre.
 - **IconButton**: mesmo contrato de estado do Button, em alvo quadrado com `MIN_TOUCH`.
   `accessibilityLabel` é obrigatório porque não há texto visível que o substitua.
 - **Field**: campo de texto de uma linha. Estados: default (`color.surface2`, borda
-  `color.line`); focused (borda `color.accent`); error (borda `color.danger` + legenda em
-  `color.danger`, sem remover a legenda de ajuda); disabled (`color.text3`).
+  `color.line`); focused (borda `color.text2`, não `accent` — o acento fica reservado a
+  progresso e ação primária); error (borda `color.danger` + legenda em `color.danger`, que
+  **substitui** a legenda de ajuda, não convive com ela); disabled (`color.text3`).
   `accessibilityLabel` cobre o rótulo do campo.
 - **PageField**: variante numérica do Field para "De"/"Até" de página. Mesmos estados do Field,
   mais um estado de valor pré-preenchido (não editado ainda) versus editado, para diferenciar o
   atalho aplicado do valor digitado.
-- **Chip**: seleção de baixo compromisso (filtro, atalho de página). `radius.chip`. Estados:
-  default (`color.surface2`); pressed; selected (`color.accentSoft` + texto `color.accent`);
-  disabled.
+- **Chip**: seleção de baixo compromisso (filtro, atalho de página). `radius.pill`. Estados:
+  default (fundo transparente, borda `color.line2`); pressed; selected (invertido: fundo
+  `color.text`, texto escuro — tinta clara com texto escuro, não `accentSoft`); disabled.
 - **Segmented**: alternância entre poucas opções mutuamente exclusivas. Estados por segmento:
   default; pressed; selected (fundo `color.surface3`, texto `color.text`); disabled. Só um
   segmento selecionado por vez; a troca é instantânea, sem `motion.enter`.
 - **Cover**: capa do livro. Capa tipográfica gerada (paleta de capas, seção 1) por padrão; capa
-  real (`expo-image`) por cima quando `cover_url` existir, com crossfade `motion.skeleton`
-  (200 ms) na troca. Tamanhos de uso: 86 no hero da Hoje, 48 na fileira "Também lendo". Estados:
-  loading (skeleton no formato da capa, nunca spinner); loaded; error (cai para a capa tipográfica
-  gerada, nunca para um placeholder genérico).
+  real (`expo-image`) por cima quando `cover_url` existir, com crossfade de 200 ms na troca.
+  Tamanhos nomeados (`size`): `xs` 48, `sm` 74, `md` 108, `lg` 160 — a altura sai sempre da
+  proporção 2:3. A prop `width` (número) tem precedência sobre `size` para os tamanhos que as
+  telas pedem e a tabela não cobre (52 na Estante, 86 na Hoje, 100 no detalhe do livro); o
+  tamanho do título escala com `width` pela mesma proporção da tabela. Estados: loading (skeleton
+  no formato da capa, nunca spinner); loaded; error (cai para a capa tipográfica gerada, nunca
+  para um placeholder genérico).
 - **Ring**: anel de nível. Estados: default (progresso estático até o valor atual); counting
   (`motion.count`, 600 ms, ease-out, só na conquista de nível); reduced motion (aparece direto no
   valor final, sem contagem). Pressionável quando leva a Você: nesse caso segue os estados de
   pressed do Button.
 - **ProgressBar**: barra linear (progresso de capítulo, resumo de registro). Estados: default;
   updating (anima até o novo valor com `motion.count` quando o valor muda por uma ação do usuário,
-  sem animar em carregamento inicial); complete (atinge 100%, cor `color.accent`).
+  sem animar em carregamento inicial). Não existe estado "complete": em 100% o preenchimento
+  continua em `color.text`, a cor de progresso de leitura (ver regra de cor da seção 1) — a barra
+  não muda de cor por chegar ao fim.
 - **Skeleton**: placeholder de carregamento no formato exato do conteúdo final (card, linha,
   capa), nunca um spinner de tela cheia. Único estado: loading, com crossfade `motion.skeleton`
   (200 ms) para o conteúdo real ao terminar.
 - **EmptyState**: estante vazia, catálogo sem resultado, sem conquista ainda. Composição: texto
   de voz (seção 7) e CTA opcional. Não é um erro; não usa `color.danger`.
 - **Banner**: aviso no topo da tela (erro de rede preservando o que já carregou, aviso de
-  reflexão fraca). Variantes: informativo (`color.accentSoft`), erro (`color.dangerSoft`),
-  sucesso (`color.positiveSoft`). Sem dispensar automaticamente: some quando a causa é corrigida.
+  reflexão fraca). Duas variantes, não três: `error` (`color.dangerSoft`, texto `color.danger`) e
+  `info` (`color.surface1`, texto `color.text2`). Sem dispensar automaticamente: some quando a
+  causa é corrigida.
 - **ListRow**: linha de lista com divisória (`color.line`), no lugar do card do sistema legado.
   Estados: default; pressed (`color.surface3`) quando a linha é tocável; disabled. Sem sombra,
   sem borda lateral de destaque (anti-pattern, seção 9).
@@ -204,8 +220,8 @@ gamificação. Um acento por tela. Métrica real, nunca inflada. Confiança sób
 
 Checklist de revisão. **(T)** marca o item coberto por teste automatizado na Tarefa 17.
 
-- Cor literal (hex, `rgb()` ou `rgba()`) fora de `tokens.ts` em `src/ui`, `src/features` ou `app`
-  (T)
+- Cor literal (hex, `rgb()` ou `rgba()`) fora de `tokens.ts` em `src/ui`, `src/assistant` ou
+  `src/game` (T) — `app/` e `src/features` entram sob guarda na F4
 - `fontSize` ou `fontFamily` literal fora de `tokens.ts` (T)
 - `Alert.alert` fora da lista de exceção (T)
 - Emoji em copy de interface (T)

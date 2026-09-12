@@ -7,3 +7,4 @@ export { PageField } from './PageField';
 export { Chip } from './Chip';
 export { Segmented } from './Segmented';
 export type { SegmentedOption } from './Segmented';
+export { Cover } from './Cover';

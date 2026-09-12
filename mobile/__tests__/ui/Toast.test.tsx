@@ -1,6 +1,7 @@
 import { render, fireEvent, act } from '@testing-library/react-native';
-import { Pressable, Text as RNText } from 'react-native';
+import { Pressable, StyleSheet, Text as RNText } from 'react-native';
 import { ToastProvider, useToast } from '../../src/ui/Toast';
+import { color } from '../../src/theme/tokens';
 
 function Tela({ opts }: { opts: any }) {
   const { show } = useToast();
@@ -68,5 +69,42 @@ describe('Toast', () => {
     const { getByLabelText, getByRole } = montar({ message: 'Salvo' });
     fireEvent.press(getByLabelText('disparar'));
     expect(getByRole('alert')).toBeTruthy();
+  });
+
+  it('limpa o timer pendente quando desmonta, para nao disparar contra arvore morta', () => {
+    const clearSpy = jest.spyOn(global, 'clearTimeout');
+    const { getByLabelText, unmount } = montar({ message: 'Salvo' });
+    fireEvent.press(getByLabelText('disparar'));
+    clearSpy.mockClear();
+    unmount();
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
+  });
+
+  it('estoura sem ToastProvider por cima, para nao falhar em silencio', () => {
+    // React loga o erro do throw no console durante o render: silencia so
+    // aqui, para nao poluir a saida do teste com um erro esperado.
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    function SemProvider() {
+      useToast();
+      return null;
+    }
+    expect(() => render(<SemProvider />)).toThrow(
+      'useToast precisa de um ToastProvider acima na arvore',
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('pinta o indicador com a cor do tom pedido, sucesso e erro nao podem parecer iguais', () => {
+    const { getByLabelText, getByTestId, rerender } = montar({ message: 'Ok', tone: 'success' });
+    fireEvent.press(getByLabelText('disparar'));
+    const sucesso = StyleSheet.flatten(getByTestId('toast-indicator').props.style);
+    expect(sucesso.backgroundColor).toBe(color.positive);
+
+    rerender(<ToastProvider><Tela opts={{ message: 'Falhou', tone: 'error' }} /></ToastProvider>);
+    fireEvent.press(getByLabelText('disparar'));
+    const erro = StyleSheet.flatten(getByTestId('toast-indicator').props.style);
+    expect(erro.backgroundColor).toBe(color.danger);
+    expect(erro.backgroundColor).not.toBe(sucesso.backgroundColor);
   });
 });

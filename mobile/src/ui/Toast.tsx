@@ -1,22 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import * as SafeAreaContext from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
-import { elevation, radius, space } from '../theme/tokens';
-
-type SafeAreaModule = typeof SafeAreaContext;
-
-// O mock oficial do pacote (react-native-safe-area-context/jest/mock, usado em
-// jest.setup.ui.js) faz `export default {...}`; passado pelo babel deste
-// projeto (CommonJS), isso aninha os hooks dentro de ".default" em vez de
-// exporta-los no topo do modulo, como o pacote real faz em runtime. Resolve os
-// dois formatos aqui, sem tocar no setup global do Jest (outras suites usam).
-const safeArea: SafeAreaModule =
-  'useSafeAreaInsets' in SafeAreaContext
-    ? SafeAreaContext
-    : (SafeAreaContext as unknown as { default: SafeAreaModule }).default;
-const { useSafeAreaInsets } = safeArea;
+import { color, elevation, radius, space } from '../theme/tokens';
 
 export interface ToastOptions {
   message: string;
@@ -27,6 +14,20 @@ export interface ToastOptions {
 }
 
 const DURATION_MS = 4000;
+
+// A CustomTabBar legada (BAR_H 72 + faixa fixa de 28) nao expoe sua altura via
+// inset real. Ate a F3 trazer a tab bar nova com insets de verdade, o toast
+// sobe por este valor fixo para nao ficar atras dela; a conferencia visual
+// fina fica para a F8.
+const TAB_BAR_CLEARANCE = 90;
+
+// Ponto indicador a esquerda do texto: sem ele, toast de erro e de sucesso sao
+// visualmente identicos, e quem le rapido nao distingue os dois.
+const TONE_INDICATOR: Record<NonNullable<ToastOptions['tone']>, { dot: string; halo: string }> = {
+  success: { dot: color.positive, halo: color.positiveSoft },
+  error: { dot: color.danger, halo: color.dangerSoft },
+  info: { dot: color.text2, halo: color.surface2 },
+};
 
 const ToastContext = createContext<{ show: (o: ToastOptions) => void } | null>(null);
 
@@ -70,8 +71,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           exiting={FadeOutDown.duration(160)}
           accessible
           accessibilityRole="alert"
-          style={[styles.wrap, elevation.floating, { bottom: insets.bottom + 90 }]}
+          style={[styles.wrap, elevation.floating, { bottom: insets.bottom + TAB_BAR_CLEARANCE }]}
         >
+          <View style={[styles.indicatorHalo, { backgroundColor: TONE_INDICATOR[toast.tone ?? 'info'].halo }]}>
+            <View
+              testID="toast-indicator"
+              style={[styles.indicatorDot, { backgroundColor: TONE_INDICATOR[toast.tone ?? 'info'].dot }]}
+            />
+          </View>
           <View style={styles.texts}>
             <Text variant="callout">{toast.message}</Text>
             {toast.detail ? <Text variant="caption" tone="secondary">{toast.detail}</Text> : null}
@@ -104,4 +111,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.control + 2,
   },
   texts: { flex: 1, gap: 1 },
+  indicatorHalo: {
+    width: space.lg,
+    height: space.lg,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  indicatorDot: {
+    width: space.sm,
+    height: space.sm,
+    borderRadius: radius.pill,
+  },
 });

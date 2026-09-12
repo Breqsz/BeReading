@@ -1,13 +1,20 @@
 import '../global.css';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+import { View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/stores/authStore';
 import { loadOrCreateProfile } from '../src/api/profile';
-import { useLuminousFonts } from '../src/theme/fonts';
+import { useAppFonts } from '../src/theme/fonts';
+import { color } from '../src/theme/tokens';
+
+// A splash fica até fonte e sessão estarem prontas. Sem isso, o app pisca uma
+// tela vazia entre a splash e a primeira rota — num app escuro, isso aparece.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const fontsLoaded = useLuminousFonts();
+  const fontsLoaded = useAppFonts();
   const {
     session,
     profile,
@@ -79,7 +86,15 @@ export default function RootLayout() {
     // session + confirmed + !profile: createProfile em andamento, aguarda
   }, [session, profile, segments, isInitialized, router]);
 
+  const onLayout = useCallback(() => {
+    if (fontsLoaded && isInitialized) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded, isInitialized]);
+
   if (!fontsLoaded) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <View style={{ flex: 1, backgroundColor: color.bg }} onLayout={onLayout}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
+    </View>
+  );
 }

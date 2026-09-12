@@ -58,10 +58,7 @@
         "displayName": "node",
         "testEnvironment": "node",
         "testMatch": [
-          "<rootDir>/__tests__/utils/**/*.test.ts",
-          "<rootDir>/__tests__/api/**/*.test.ts",
-          "<rootDir>/__tests__/stores/**/*.test.ts",
-          "<rootDir>/__tests__/screens/**/*.test.ts"
+          "<rootDir>/__tests__/**/*.test.ts"
         ],
         "transform": {
           "^.+\\.(t|j)sx?$": [
@@ -79,7 +76,7 @@
         "displayName": "react-native",
         "preset": "jest-expo",
         "testMatch": [
-          "<rootDir>/__tests__/components/**/*.test.tsx"
+          "<rootDir>/__tests__/**/*.test.tsx"
         ],
         "transformIgnorePatterns": [
           "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"

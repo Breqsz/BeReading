@@ -1,4 +1,4 @@
-import { todayInSaoPaulo, effectiveStreak, weekDays, streakRisk } from '../../src/game/streak';
+import { todayInSaoPaulo, effectiveStreak, weekDays, streakRisk, hourInSaoPaulo } from '../../src/game/streak';
 
 /** 21:00 em São Paulo = 00:00 UTC do dia seguinte (UTC−3). */
 const spNoite = new Date('2026-09-12T00:00:00.000Z');
@@ -11,6 +11,24 @@ describe('todayInSaoPaulo', () => {
 
   it('meio-dia UTC cai no mesmo dia', () => {
     expect(todayInSaoPaulo(new Date('2026-09-11T15:00:00.000Z'))).toBe('2026-09-11');
+  });
+});
+
+// A Tarefa 8 (src/assistant/lines.ts) passou a importar hourInSaoPaulo direto
+// daqui em vez de reimplementar o deslocamento de fuso. Até então a função só
+// era exercitada indiretamente via streakRisk; agora que virou contrato
+// consumido por outro módulo, merece teste direto.
+describe('hourInSaoPaulo', () => {
+  it('de noite', () => {
+    expect(hourInSaoPaulo(new Date('2026-09-12T00:00:00.000Z'))).toBe(21);
+  });
+
+  it('de tarde', () => {
+    expect(hourInSaoPaulo(new Date('2026-09-11T19:00:00.000Z'))).toBe(16);
+  });
+
+  it('de manha', () => {
+    expect(hourInSaoPaulo(new Date('2026-09-11T11:00:00.000Z'))).toBe(8);
   });
 });
 

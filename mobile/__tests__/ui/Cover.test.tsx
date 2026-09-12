@@ -28,6 +28,14 @@ describe('Cover', () => {
     expect(getByTestId('cover-real')).toBeTruthy();
     // A gerada continua atras: e ela que aparece enquanto a imagem carrega.
     expect(getByTestId('cover-generated')).toBeTruthy();
+    // So os dois testID existirem nao prova o empilhamento: teria passado
+    // igual com a ordem invertida no JSX ou sem o position absolute. O que
+    // prova a gerada ficar atras, como placeholder, e a real estar ancorada
+    // em cima dela via position absolute no canto 0,0.
+    const real = StyleSheet.flatten(getByTestId('cover-real').props.style);
+    expect(real.position).toBe('absolute');
+    expect(real.top).toBe(0);
+    expect(real.left).toBe(0);
   });
 
   it('a capa inteira e um so elemento para o leitor de tela', () => {

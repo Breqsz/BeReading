@@ -72,4 +72,11 @@ describe('ProgressBar', () => {
       expect.objectContaining({ width: '0%' }),
     );
   });
+
+  it('valor invalido nao quebra: trata como zero', () => {
+    const { getByTestId } = render(<ProgressBar progress={Number.NaN} accessibilityLabel="Invalido" />);
+    expect(getByTestId('progress-fill').props.style).toEqual(
+      expect.objectContaining({ width: '0%' }),
+    );
+  });
 });

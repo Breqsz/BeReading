@@ -1,23 +1,54 @@
+import { StyleSheet } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { Text as RNText } from 'react-native';
 import { Skeleton } from '../../src/ui/Skeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
 import { Banner } from '../../src/ui/Banner';
 import { ListRow } from '../../src/ui/ListRow';
+import { MIN_TOUCH } from '../../src/theme/tokens';
 
 // O mock oficial de react-native-reanimated (usado globalmente no
 // jest.setup.ui.js) deixa useReducedMotion de fora de proposito — o proprio
 // arquivo do pacote comenta "ADD ME IF NEEDED". Sobrescreve so aqui, sem
-// tocar no setup global, que outras suites tambem usam.
-jest.mock('react-native-reanimated', () => ({
-  ...jest.requireActual('react-native-reanimated/mock'),
-  useReducedMotion: () => false,
-}));
+// tocar no setup global, que outras suites tambem usam. Os dois viram
+// controlaveis por teste (variavel + spy, prefixo "mock" exigido pelo
+// hoisting do jest.mock) para provar os dois caminhos do Skeleton, nao so
+// declarar que o codigo "parece" certo.
+let mockReducedMotion = false;
+// Assinatura em rest parameter, nao um unico argumento: espalhar um
+// `unknown[]` (nao tupla) numa funcao de um parametro so e erro de tipo
+// (TS2556). Com rest parameter, o spread abaixo aceita.
+const mockWithRepeat = jest.fn((...args: unknown[]) => args[0]);
+
+jest.mock('react-native-reanimated', () => {
+  const real = jest.requireActual('react-native-reanimated/mock');
+  return {
+    ...real,
+    useReducedMotion: () => mockReducedMotion,
+    withRepeat: (...args: unknown[]) => mockWithRepeat(...args),
+  };
+});
+
+beforeEach(() => {
+  mockReducedMotion = false;
+  mockWithRepeat.mockClear();
+});
 
 describe('Skeleton', () => {
   it('se anuncia como carregando, para o leitor de tela nao ler caixa vazia', () => {
     const { getByLabelText } = render(<Skeleton width={100} height={12} />);
     expect(getByLabelText('Carregando')).toBeTruthy();
+  });
+
+  it('pulsa quando o usuario nao pediu menos movimento', () => {
+    render(<Skeleton width={100} height={12} />);
+    expect(mockWithRepeat).toHaveBeenCalled();
+  });
+
+  it('nao inicia a animacao com reduce motion ligado', () => {
+    mockReducedMotion = true;
+    render(<Skeleton width={100} height={12} />);
+    expect(mockWithRepeat).not.toHaveBeenCalled();
   });
 });
 
@@ -107,5 +138,15 @@ describe('ListRow', () => {
     );
     expect(getByText('L')).toBeTruthy();
     expect(getByText('92')).toBeTruthy();
+  });
+
+  it('respeita o alvo minimo de toque na linha', () => {
+    // Sem onPress, o retorno do componente e a propria View da linha: o
+    // toJSON() da raiz ja e o no com o minHeight, sem precisar navegar a
+    // arvore (o Pressable, quando existe, nao carrega esse estilo — quem
+    // carrega e o View interno que ele envolve).
+    const { toJSON } = render(<ListRow title="Capítulo 4" />);
+    const linha = StyleSheet.flatten((toJSON() as any).props.style);
+    expect(linha.minHeight).toBeGreaterThanOrEqual(MIN_TOUCH);
   });
 });

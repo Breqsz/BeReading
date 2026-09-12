@@ -1,9 +1,13 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Text as RNText } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { X } from 'lucide-react-native';
 import { Button } from '../../src/ui/Button';
 import { IconButton } from '../../src/ui/IconButton';
 import { color, MIN_TOUCH } from '../../src/theme/tokens';
+
+// Espiao em vez do icone real do lucide: evita o transform do pacote e
+// deixa a cor recebida visivel como texto, pronta para asserir.
+const IconSpy = ({ color: c }: { color: string }) => <RNText>{c}</RNText>;
 
 describe('Button', () => {
   it('chama onPress no toque', () => {
@@ -62,6 +66,34 @@ describe('Button', () => {
   it('respeita o alvo minimo de toque', () => {
     const { getByRole } = render(<Button onPress={jest.fn()}>Ir</Button>);
     expect(StyleSheet.flatten(getByRole('button').props.style).height).toBeGreaterThanOrEqual(MIN_TOUCH);
+  });
+
+  it('o secundario usa a superficie 2 com borda visivel', () => {
+    const { getByRole } = render(<Button variant="secondary" onPress={jest.fn()}>Ir</Button>);
+    const s = StyleSheet.flatten(getByRole('button').props.style);
+    expect(s.backgroundColor).toBe(color.surface2);
+    expect(s.borderColor).toBe(color.line2);
+  });
+
+  it('o ghost fica transparente e sem borda', () => {
+    const { getByRole } = render(<Button variant="ghost" onPress={jest.fn()}>Ir</Button>);
+    const s = StyleSheet.flatten(getByRole('button').props.style);
+    expect(s.backgroundColor).toBe('transparent');
+    expect(s.borderColor).toBeUndefined();
+  });
+
+  it('o icone segue o mesmo tom do texto quando o botao esta desabilitado', () => {
+    const { getByText } = render(
+      <Button icon={IconSpy} disabled onPress={jest.fn()}>Registrar</Button>,
+    );
+    expect(getByText(color.text3)).toBeTruthy();
+  });
+
+  it('o icone do primario usa a tinta escura sobre o acento', () => {
+    const { getByText } = render(
+      <Button icon={IconSpy} onPress={jest.fn()}>Registrar</Button>,
+    );
+    expect(getByText(color.accentInk)).toBeTruthy();
   });
 });
 

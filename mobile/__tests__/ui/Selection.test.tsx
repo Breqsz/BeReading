@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { Chip } from '../../src/ui/Chip';
 import { Segmented } from '../../src/ui/Segmented';
-import { color } from '../../src/theme/tokens';
+import { color, MIN_TOUCH } from '../../src/theme/tokens';
 
 describe('Chip', () => {
   it('avisa o leitor de tela quando esta selecionado', () => {
@@ -58,5 +58,15 @@ describe('Segmented', () => {
     );
     fireEvent.press(getByLabelText('Lendo · 1'));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('respeita o alvo minimo de toque em cada opcao', () => {
+    // O mockup usa escala ~0.75 do aparelho real: o 34 dali equivale a uns 45
+    // reais. Aqui o alvo tem que ser o MIN_TOUCH de verdade.
+    const { getByLabelText } = render(
+      <Segmented options={opcoes} value="lendo" onChange={jest.fn()} />,
+    );
+    const s = StyleSheet.flatten(getByLabelText('Lendo · 1').props.style);
+    expect(s.minHeight).toBeGreaterThanOrEqual(MIN_TOUCH);
   });
 });

@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { Text } from './Text';
+import { Text, TONE_COLOR } from './Text';
 import { color, radius, space, motion, MIN_TOUCH } from '../theme/tokens';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive';
@@ -66,7 +66,7 @@ export function Button({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? children}
-      accessibilityState={{ disabled, busy: loading }}
+      accessibilityState={{ disabled: inativo, busy: loading }}
       onPress={inativo ? undefined : onPress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -82,7 +82,10 @@ export function Button({
       {loading ? (
         <ActivityIndicator size="small" color={color.text3} />
       ) : (
-        Icon ? <Icon size={18} color={tinta === 'inverse' ? color.accentInk : color.text} strokeWidth={2.2} /> : null
+        // O icone usa a mesma tabela de tom do Text ao lado, em vez de so
+        // distinguir 'inverse': senao ghost/desabilitado ficam com icone
+        // aceso e texto apagado.
+        Icon ? <Icon size={18} color={TONE_COLOR[tinta]} strokeWidth={2.2} /> : null
       )}
       <Text variant="button" tone={tinta}>{children}</Text>
     </AnimatedPressable>

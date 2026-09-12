@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
-import { color, radius, space } from '../theme/tokens';
+import { color, radius, space, MIN_TOUCH } from '../theme/tokens';
 
 export interface SegmentedOption {
   value: string;
@@ -47,7 +47,9 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    minHeight: 34,
+    // O 34 do mockup vem de uma tela desenhada a ~0.75 da escala real: aqui
+    // o alvo tem que ser o MIN_TOUCH de verdade, nao o valor do desenho.
+    minHeight: MIN_TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.chip - 2,

@@ -1,6 +1,8 @@
+import { StyleSheet } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { Field } from '../../src/ui/Field';
 import { PageField } from '../../src/ui/PageField';
+import { color } from '../../src/theme/tokens';
 
 describe('Field', () => {
   it('associa o rotulo ao campo para o leitor de tela', () => {
@@ -27,11 +29,10 @@ describe('Field', () => {
   });
 
   it('mostra a dica quando nao ha erro', () => {
-    const { getByText, queryByText } = render(
+    const { getByText } = render(
       <Field label="Senha" value="" onChangeText={jest.fn()} hint="Mínimo de 6 caracteres" />,
     );
     expect(getByText('Mínimo de 6 caracteres')).toBeTruthy();
-    expect(queryByText('erro')).toBeNull();
   });
 
   it('o erro substitui a dica, para nao empilhar mensagem', () => {
@@ -49,6 +50,20 @@ describe('Field', () => {
     );
     fireEvent.changeText(getByLabelText('Nome'), 'Guilherme');
     expect(onChangeText).toHaveBeenCalledWith('Guilherme');
+  });
+
+  it('muda a borda no foco e volta ao perder o foco', () => {
+    const { getByLabelText } = render(
+      <Field label="Nome" value="" onChangeText={jest.fn()} />,
+    );
+    // input.parent e o proprio composite TextInput; a View com a borda (o
+    // "box") fica um nivel acima disso.
+    const input = getByLabelText('Nome');
+    const box = input.parent!.parent!;
+    fireEvent(input, 'focus');
+    expect(StyleSheet.flatten(box.props.style).borderColor).toBe(color.text2);
+    fireEvent(input, 'blur');
+    expect(StyleSheet.flatten(box.props.style).borderColor).toBe(color.line);
   });
 });
 
@@ -74,5 +89,17 @@ describe('PageField', () => {
       <PageField label="Até" value="" onChange={jest.fn()} max={215} accessibilityLabel="Página final" />,
     );
     expect(getByLabelText('Página final').props.maxLength).toBe(3);
+  });
+
+  it('muda a borda no foco e volta ao perder o foco', () => {
+    const { getByLabelText } = render(
+      <PageField label="De" value="" onChange={jest.fn()} accessibilityLabel="Página inicial" />,
+    );
+    const input = getByLabelText('Página inicial');
+    const box = input.parent!.parent!;
+    fireEvent(input, 'focus');
+    expect(StyleSheet.flatten(box.props.style).borderColor).toBe(color.text2);
+    fireEvent(input, 'blur');
+    expect(StyleSheet.flatten(box.props.style).borderColor).toBe(color.line);
   });
 });

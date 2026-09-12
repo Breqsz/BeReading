@@ -3,7 +3,9 @@ import { type as typeTokens, color, type TypeVariant } from '../theme/tokens';
 
 export type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent' | 'positive' | 'danger' | 'inverse';
 
-const TONE_COLOR: Record<Tone, string> = {
+// Exportado para outros primitivos (ex.: Button) pintarem icone exatamente na
+// mesma cor do tone do texto ao lado, sem duplicar a tabela.
+export const TONE_COLOR: Record<Tone, string> = {
   primary: color.text,
   secondary: color.text2,
   tertiary: color.text3,

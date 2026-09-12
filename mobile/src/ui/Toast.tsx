@@ -37,7 +37,7 @@ export function useToast() {
   return ctx;
 }
 
-// Substitui os 20 Alert.alert do app. O alerta de sistema tapa a tela, exige um
+// Substitui os 20 alertas de sistema do app. O alerta de sistema tapa a tela, exige um
 // toque para sumir e some sem deixar rastro; o toast confirma e sai sozinho.
 // So confirmacao destrutiva continua em dialogo.
 export function ToastProvider({ children }: { children: React.ReactNode }) {

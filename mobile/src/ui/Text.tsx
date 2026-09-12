@@ -1,0 +1,49 @@
+import { Text as RNText, StyleSheet, type TextProps, type TextStyle, type StyleProp } from 'react-native';
+import { type as typeTokens, color, type TypeVariant } from '../theme/tokens';
+
+export type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent' | 'positive' | 'danger' | 'inverse';
+
+const TONE_COLOR: Record<Tone, string> = {
+  primary: color.text,
+  secondary: color.text2,
+  tertiary: color.text3,
+  accent: color.accent,
+  positive: color.positive,
+  danger: color.danger,
+  inverse: color.accentInk,
+};
+
+interface Props extends Omit<TextProps, 'style'> {
+  variant?: TypeVariant;
+  tone?: Tone;
+  align?: TextStyle['textAlign'];
+  style?: StyleProp<TextStyle>;
+  children: React.ReactNode;
+}
+
+// Um Text so, por variante. E o que encerra os 26 tamanhos de fonte soltos do
+// app antigo: quem precisa de um tamanho novo acrescenta variante no token, e a
+// guarda de __tests__/guards barra fontSize literal em tela.
+export function Text({ variant = 'body', tone = 'primary', align, style, children, ...rest }: Props) {
+  const t = typeTokens[variant];
+  return (
+    <RNText
+      {...rest}
+      maxFontSizeMultiplier={t.maxFontSizeMultiplier}
+      style={[styles[variant], { color: TONE_COLOR[tone] }, align ? { textAlign: align } : null, style]}
+    >
+      {children}
+    </RNText>
+  );
+}
+
+// StyleSheet.create em vez de objeto inline: o estilo e registrado uma vez, nao
+// recriado a cada render.
+const styles = StyleSheet.create(
+  Object.fromEntries(
+    Object.entries(typeTokens).map(([k, v]) => {
+      const { maxFontSizeMultiplier: _teto, ...textStyle } = v;
+      return [k, textStyle];
+    }),
+  ) as Record<TypeVariant, TextStyle>,
+);

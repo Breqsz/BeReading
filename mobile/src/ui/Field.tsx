@@ -13,7 +13,7 @@ interface Props extends Omit<TextInputProps, 'style'> {
   icon?: IconCmp;
 }
 
-// O erro vive no campo, nao num alerta de sistema: quem erra a senha precisa ver o
+// O erro vive no campo, nao num Alert.alert: quem erra a senha precisa ver o
 // motivo ao lado do que digitou, nao numa caixa de sistema que some.
 export function Field({ label, error, hint, icon: Icon, ...input }: Props) {
   const [focused, setFocused] = useState(false);

@@ -9,7 +9,7 @@ interface Props {
 }
 
 // Erro que nao derruba a tela: o que ja carregou continua visivel e o banner
-// explica o resto. Substitui o alerta de sistema, que tapa a tela e some sem rastro.
+// explica o resto. Substitui o Alert.alert, que tapa a tela e some sem rastro.
 export function Banner({ tone, message, onRetry }: Props) {
   return (
     <View

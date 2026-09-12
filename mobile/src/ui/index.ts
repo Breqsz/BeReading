@@ -8,3 +8,5 @@ export { Chip } from './Chip';
 export { Segmented } from './Segmented';
 export type { SegmentedOption } from './Segmented';
 export { Cover } from './Cover';
+export { Ring } from './Ring';
+export { ProgressBar } from './ProgressBar';

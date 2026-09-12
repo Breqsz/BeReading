@@ -1,0 +1,75 @@
+import { render } from '@testing-library/react-native';
+import { Text as RNText } from 'react-native';
+import { Ring } from '../../src/ui/Ring';
+import { ProgressBar } from '../../src/ui/ProgressBar';
+
+// O Circle do react-native-svg normaliza strokeDasharray para um array de
+// strings numericas antes de expor a prop (nao devolve o "a b" que passamos).
+// Um split(' ') ingenuo daria sempre NaN aqui; isto le os dois valores
+// independente do formato devolvido pela versao instalada da lib.
+function lerDasharray(valor: unknown): [number, number] {
+  const partes = Array.isArray(valor) ? valor : String(valor).trim().split(/[\s,]+/);
+  return [Number(partes[0]), Number(partes[1])];
+}
+
+describe('Ring', () => {
+  it('desenha o arco proporcional ao progresso', () => {
+    const { getByTestId } = render(<Ring progress={0.5} size={100} accessibilityLabel="Nível 4" />);
+    const [preenchido, total] = lerDasharray(getByTestId('ring-progress').props.strokeDasharray);
+    expect(preenchido / total).toBeCloseTo(0.5, 2);
+  });
+
+  it('progresso 0 nao desenha arco', () => {
+    const { getByTestId } = render(<Ring progress={0} size={100} accessibilityLabel="Nível 1" />);
+    expect(lerDasharray(getByTestId('ring-progress').props.strokeDasharray)[0]).toBe(0);
+  });
+
+  it('progresso acima de 1 satura, em vez de dar a volta', () => {
+    const { getByTestId } = render(<Ring progress={1.4} size={100} accessibilityLabel="Topo" />);
+    const [preenchido, total] = lerDasharray(getByTestId('ring-progress').props.strokeDasharray);
+    expect(preenchido).toBeCloseTo(total, 1);
+  });
+
+  it('valor invalido nao quebra: trata como zero', () => {
+    const { getByTestId } = render(<Ring progress={Number.NaN} size={100} accessibilityLabel="X" />);
+    expect(lerDasharray(getByTestId('ring-progress').props.strokeDasharray)[0]).toBe(0);
+  });
+
+  it('anuncia o progresso para o leitor de tela', () => {
+    const { getByLabelText } = render(<Ring progress={0.84} size={100} accessibilityLabel="Nível 4" />);
+    const el = getByLabelText('Nível 4');
+    expect(el.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 84 });
+  });
+
+  it('renderiza o conteudo central', () => {
+    const { getByText } = render(
+      <Ring progress={0.5} size={100} accessibilityLabel="Nível 4">
+        <RNText>4</RNText>
+      </Ring>,
+    );
+    expect(getByText('4')).toBeTruthy();
+  });
+});
+
+describe('ProgressBar', () => {
+  it('preenche a fracao certa', () => {
+    const { getByTestId } = render(<ProgressBar progress={0.4} accessibilityLabel="40 por cento lido" />);
+    expect(getByTestId('progress-fill').props.style).toEqual(
+      expect.objectContaining({ width: '40%' }),
+    );
+  });
+
+  it('satura em 100 por cento', () => {
+    const { getByTestId } = render(<ProgressBar progress={2} accessibilityLabel="Concluído" />);
+    expect(getByTestId('progress-fill').props.style).toEqual(
+      expect.objectContaining({ width: '100%' }),
+    );
+  });
+
+  it('nao vai abaixo de zero com valor negativo', () => {
+    const { getByTestId } = render(<ProgressBar progress={-1} accessibilityLabel="Nada lido" />);
+    expect(getByTestId('progress-fill').props.style).toEqual(
+      expect.objectContaining({ width: '0%' }),
+    );
+  });
+});

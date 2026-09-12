@@ -13,7 +13,7 @@ const TONE_COLOR: Record<Tone, string> = {
   inverse: color.accentInk,
 };
 
-interface Props extends Omit<TextProps, 'style'> {
+interface Props extends Omit<TextProps, 'style' | 'maxFontSizeMultiplier'> {
   variant?: TypeVariant;
   tone?: Tone;
   align?: TextStyle['textAlign'];
@@ -37,13 +37,18 @@ export function Text({ variant = 'body', tone = 'primary', align, style, childre
   );
 }
 
-// StyleSheet.create em vez de objeto inline: o estilo e registrado uma vez, nao
-// recriado a cada render.
+// StyleSheet.create em vez de objeto inline: a plataforma registra o estilo
+// uma vez e o reusa por id nas renderizações seguintes, em vez de comparar o
+// objeto inteiro a cada uma.
 const styles = StyleSheet.create(
   Object.fromEntries(
     Object.entries(typeTokens).map(([k, v]) => {
       const { maxFontSizeMultiplier: _teto, ...textStyle } = v;
       return [k, textStyle];
     }),
+    // O cast abaixo e seguro: `type` em tokens.ts ja e anotado como
+    // Record<TypeVariant, TypeStyle>, entao o compilador garante la que toda
+    // variante tem entrada e nao ha entrada a mais. O `as` so recupera a
+    // uniao literal de chaves que Object.fromEntries descarta.
   ) as Record<TypeVariant, TextStyle>,
 );

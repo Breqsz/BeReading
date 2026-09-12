@@ -22,7 +22,9 @@ describe('Text', () => {
     ['secondary', color.text2],
     ['tertiary', color.text3],
     ['accent', color.accent],
+    ['positive', color.positive],
     ['danger', color.danger],
+    ['inverse', color.accentInk],
   ])('o tone %s pinta com o token certo', (tone, esperado) => {
     const { getByText } = render(<Text tone={tone as any}>Cor</Text>);
     expect(StyleSheet.flatten(getByText('Cor').props.style).color).toBe(esperado);
@@ -39,11 +41,14 @@ describe('Text', () => {
     expect(StyleSheet.flatten(getByText('1840').props.style).fontVariant).toEqual(['tabular-nums']);
   });
 
-  it('deixa o chamador sobrescrever com style, sem perder a variante', () => {
-    const { getByText } = render(<Text variant="body" style={{ marginTop: 8 }}>X</Text>);
+  it('o style do chamador vence sobre a variante, sem apagar o resto dela', () => {
+    const { getByText } = render(
+      <Text variant="body" style={{ fontSize: 99, marginTop: 8 }}>X</Text>,
+    );
     const s = StyleSheet.flatten(getByText('X').props.style);
-    expect(s.marginTop).toBe(8);
-    expect(s.fontSize).toBe(typeTokens.body.fontSize);
+    expect(s.fontSize).toBe(99);                                  // o do chamador vence
+    expect(s.lineHeight).toBe(typeTokens.body.lineHeight);        // o resto da variante fica
+    expect(s.marginTop).toBe(8);                                  // e o que não conflita soma
   });
 
   it('repassa numberOfLines', () => {

@@ -5,18 +5,13 @@
 //
 // Voz: 18 a 24 anos, direta, sem emoji e sem travessao. Ver DESIGN.md secao Voice.
 
-// A hora em Sao Paulo vem de src/game/streak.ts, nao e recalculada aqui: o
-// register-reading-session vira o dia nesse fuso, e duas contas separadas
-// para a mesma virada divergem no primeiro ajuste (esse projeto ja teve esse
-// bug exato, registrado como BER-78 — formula duplicada no servidor somando
-// o fuso da maquina a um instante ja absoluto).
-import { hourInSaoPaulo } from '../game/streak';
-
-export function greeting(now: Date = new Date()): string {
-  const h = hourInSaoPaulo(now);
-  if (h < 12) return 'Bom dia,';
-  if (h < 18) return 'Boa tarde,';
-  return 'Boa noite,';
+// Sem variacao por periodo do dia: isso era invencao do plano, nao esta na
+// spec (parag. 3.5), e o mockup aprovado pelo Breq rejeitou explicitamente o
+// registro formal ("Boa noite, Guilherme") em favor do registro jovem unico
+// ("E ai, Guilherme"). Por isso greeting nao depende mais da hora e nao
+// importa hourInSaoPaulo.
+export function greeting(): string {
+  return 'E aí,';
 }
 
 export function streakLine(streak: number): string {
@@ -44,7 +39,10 @@ export function scoreLine(score: number | null): string {
   if (score === null) return 'Salvei sua resposta. A nota chega quando eu terminar de avaliar.';
   if (score >= 85) return 'Mandou bem.';
   if (score >= 70) return 'Boa. Faltou pouco pro ponto principal.';
-  return 'Quase. Olha esse detalhe que passou.';
+  if (score >= 40) return 'Quase. Olha esse detalhe que passou.';
+  // Abaixo de 40, chamar de "quase" seria mentira, e a devolutiva honesta e
+  // o principio do produto.
+  return 'Essa não foi. Vale reler o trecho antes de seguir.';
 }
 
 export type QuizStateKey = 'polling' | 'still-generating' | 'no-content' | 'failed';

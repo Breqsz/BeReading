@@ -1,3 +1,4 @@
+import * as lines from '../../src/assistant/lines';
 import {
   greeting, streakLine, streakRiskLine, chapterClosedTitle,
   levelUpLine, scoreLine, quizStateLine, pendingQuizLine,
@@ -9,18 +10,27 @@ const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u;
 const TRAVESSAO = /[—–]/;
 
 const TODAS = [
-  greeting(new Date('2026-09-11T12:00:00Z')),
+  greeting(),
   streakLine(4), streakLine(0), streakLine(1),
   streakRiskLine(3),
   chapterClosedTitle([4]), chapterClosedTitle([4, 5]),
   levelUpLine(5, 'Maratonista'),
-  scoreLine(92), scoreLine(60), scoreLine(null),
+  scoreLine(92), scoreLine(60), scoreLine(10), scoreLine(null),
   pendingQuizLine(3, 4), pendingQuizLine(3, 1),
   quizStateLine('polling', 5).text,
   quizStateLine('still-generating', 5).text,
   quizStateLine('no-content', 5).text,
   quizStateLine('failed', 5).text,
 ];
+
+// Se este teste falhar, uma fala nova foi exportada e falta pôr uma amostra
+// dela em TODAS — senão ela escapa do contrato de voz sem ninguém notar.
+it('TODAS cobre toda fala exportada por lines.ts', () => {
+  expect(Object.keys(lines).sort()).toEqual([
+    'chapterClosedTitle', 'greeting', 'levelUpLine', 'pendingQuizLine',
+    'quizStateLine', 'scoreLine', 'streakLine', 'streakRiskLine',
+  ].sort());
+});
 
 describe('contrato de voz', () => {
   it.each(TODAS)('a fala %p nao tem emoji', (texto) => {
@@ -37,12 +47,8 @@ describe('contrato de voz', () => {
 });
 
 describe('greeting', () => {
-  it.each([
-    ['2026-09-11T11:00:00Z', 'Bom dia'],
-    ['2026-09-11T18:00:00Z', 'Boa tarde'],
-    ['2026-09-12T00:00:00Z', 'Boa noite'],
-  ])('em %s cumprimenta com %s', (iso, esperado) => {
-    expect(greeting(new Date(iso))).toContain(esperado);
+  it('cumprimenta no registro jovem, sem variar por hora do dia', () => {
+    expect(greeting()).toBe('E aí,');
   });
 });
 
@@ -93,6 +99,10 @@ describe('scoreLine', () => {
 
   it('nota baixa aponta o caminho em vez de consolar', () => {
     expect(scoreLine(50)).toBe('Quase. Olha esse detalhe que passou.');
+  });
+
+  it('nota muito baixa nao chama de "quase", porque seria mentira', () => {
+    expect(scoreLine(10)).toBe('Essa não foi. Vale reler o trecho antes de seguir.');
   });
 
   it('sem nota, diz o que esta acontecendo (BER-42)', () => {

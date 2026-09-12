@@ -1,5 +1,5 @@
 import '../global.css';
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -86,14 +86,16 @@ export default function RootLayout() {
     // session + confirmed + !profile: createProfile em andamento, aguarda
   }, [session, profile, segments, isInitialized, router]);
 
-  const onLayout = useCallback(() => {
-    if (fontsLoaded && isInitialized) SplashScreen.hideAsync().catch(() => {});
+  useEffect(() => {
+    if (fontsLoaded && isInitialized) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
   }, [fontsLoaded, isInitialized]);
 
   if (!fontsLoaded) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.bg }} onLayout={onLayout}>
+    <View style={{ flex: 1, backgroundColor: color.bg }}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
     </View>
   );

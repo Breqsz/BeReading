@@ -8,8 +8,8 @@
 // (__tests__/guards/rotas.test.ts) le para saber que aquela tela tem quem a
 // alcance.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check } from 'lucide-react-native';
 import { useAuthStore } from '../src/stores/authStore';
@@ -133,8 +133,31 @@ export default function RegisterReadingScreen() {
   // registrariam a mesma leitura duas vezes, e pagina repetida conta de novo.
   const enviando = useRef(false);
 
+  // F4-18: o envio espera rede e refresh, e a tela pode sair nesse meio. O
+  // router de useRouter() e global: navegar depois disso mexeria na rota que
+  // estiver no topo, nao neste sheet.
+  const montado = useRef(true);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
+
+  // F4-18: no Android, o voltar do sistema fecharia o sheet no meio do envio.
+  // Devolver true diz "tratei", e a navegacao nao desempilha nada.
+  useEffect(() => {
+    if (!sending) return;
+    const inscricao = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => inscricao.remove();
+  }, [sending]);
+
   async function enviar() {
     if (enviando.current || !userId || !selected || !resumo?.valid) return;
+    // O "Ate" abre em foco e o toque no CTA nao fecha o teclado
+    // (keyboardShouldPersistTaps). Aberto, o teclado numerico cobre o toast de
+    // erro, que fica perto do fundo da tela.
+    Keyboard.dismiss();
     const { start: de, end: ate, pages } = resumo;
     const livro = selected.book.id;
 
@@ -151,9 +174,15 @@ export default function RegisterReadingScreen() {
     try {
       resposta = await registerReadingSession(userId, livro, de, ate);
     } catch {
+      vibrar(Haptics.NotificationFeedbackType.Error);
+      if (!montado.current) {
+        // A tela saiu no meio do envio: nao ha campo guardado nem o que tentar
+        // de novo daqui. Avisa o erro sem prometer nenhum dos dois.
+        toast.show({ message: 'Não deu pra registrar sua leitura.', tone: 'danger' });
+        return;
+      }
       enviando.current = false;
       setSending(false);
-      vibrar(Haptics.NotificationFeedbackType.Error);
       // Os campos ficam como estao. "Tentar" reenvia o que estiver digitado na
       // hora do toque, pela ref, e nao o que estava quando o erro aconteceu.
       toast.show({
@@ -161,14 +190,14 @@ export default function RegisterReadingScreen() {
         detail: 'O que você digitou continua aqui.',
         tone: 'danger',
         actionLabel: 'Tentar',
+        // O toast vive na raiz e dura mais que a tela: com o sheet ja fechado,
+        // o "Tentar" nao roda o envio de uma tela desmontada.
         onAction: () => {
-          void enviarAtual.current();
+          if (montado.current) void enviarAtual.current();
         },
       });
       return;
     }
-
-    vibrar(Haptics.NotificationFeedbackType.Success);
 
     // Recalcula o progresso antes de sair (spec S7.2 e S8): a Hoje e a tela de
     // capitulo fechado leem numero persistido, nao o de antes do envio.
@@ -178,6 +207,21 @@ export default function RegisterReadingScreen() {
       // A leitura ja esta salva no servidor; sem o recalculo, a Hoje refaz a
       // carga no proximo foco. Travar o leitor aqui nao ganha nada.
     }
+
+    const confirmacao = { ...successToast(pages, resposta.current_streak), tone: 'positive' as const };
+
+    // F4-18: o haptic de sucesso vem logo antes de sair. Vibrando antes do
+    // refresh, a pessoa sentia "pronto" e arrastava o sheet para baixo.
+    if (!montado.current) {
+      // A tela saiu no meio do envio. Nao navega nem chama back(): o router e
+      // global e mexeria na rota do topo. A leitura esta salva, e capitulo
+      // fechado aparece como pendente na Hoje (BER-54).
+      vibrar(Haptics.NotificationFeedbackType.Success);
+      toast.show(confirmacao);
+      return;
+    }
+
+    vibrar(Haptics.NotificationFeedbackType.Success);
 
     // F4-10: o caminho sai da resposta do servidor, nunca da previsao que o
     // resumo mostrou.
@@ -196,7 +240,7 @@ export default function RegisterReadingScreen() {
       return;
     }
 
-    toast.show({ ...successToast(pages, resposta.current_streak), tone: 'positive' });
+    toast.show(confirmacao);
     router.back();
   }
 
@@ -259,8 +303,13 @@ export default function RegisterReadingScreen() {
 
   const rotuloCta = resumo.valid ? ctaLabel(resumo.pages) : 'Registrar leitura';
 
+  // F4-18: enquanto envia, o sheet nao fecha por gesto (no iOS o
+  // react-native-screens traduz isso em modalInPresentation) e nada que mude o
+  // registro fica tocavel. A opcao e passada daqui, pela propria rota, sem
+  // tocar em app/_layout.tsx.
   return (
     <Screen scroll={false} edges={['bottom']} contentStyle={styles.content}>
+      <Stack.Screen options={{ gestureEnabled: !sending }} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -277,6 +326,7 @@ export default function RegisterReadingScreen() {
             currentPage={studentBook.current_page}
             switching={picking}
             onToggleSwitch={choices.length > 1 ? () => setPicking((p) => !p) : undefined}
+            disabled={sending}
           />
           {picking ? (
             <BookPicker
@@ -286,6 +336,7 @@ export default function RegisterReadingScreen() {
                 escolher(choice);
                 setPicking(false);
               }}
+              disabled={sending}
             />
           ) : null}
 
@@ -296,6 +347,7 @@ export default function RegisterReadingScreen() {
             onChangeEnd={setEnd}
             totalPages={book.total_pages}
             startHint={start === prefill && studentBook.current_page > 0 ? 'continua de onde parou' : null}
+            disabled={sending}
           />
 
           {atalhos.length > 0 ? (
@@ -303,6 +355,7 @@ export default function RegisterReadingScreen() {
               shortcuts={atalhos}
               selectedEnd={parsePage(end)}
               onPick={(pagina) => setEnd(String(pagina))}
+              disabled={sending}
             />
           ) : null}
 

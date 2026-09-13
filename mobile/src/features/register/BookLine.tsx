@@ -12,9 +12,11 @@ interface Props {
   switching: boolean;
   /** Presente so quando ha outro livro para escolher. */
   onToggleSwitch?: () => void;
+  /** Trava o "Trocar" enquanto o registro esta sendo enviado (F4-18). */
+  disabled?: boolean;
 }
 
-export function BookLine({ book, currentPage, switching, onToggleSwitch }: Props) {
+export function BookLine({ book, currentPage, switching, onToggleSwitch, disabled = false }: Props) {
   return (
     <ListRow
       last
@@ -27,6 +29,7 @@ export function BookLine({ book, currentPage, switching, onToggleSwitch }: Props
             variant="ghost"
             size="md"
             onPress={onToggleSwitch}
+            disabled={disabled}
             accessibilityLabel={switching ? 'Fechar lista de livros' : 'Trocar livro'}
           >
             {switching ? 'Fechar' : 'Trocar'}

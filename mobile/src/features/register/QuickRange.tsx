@@ -14,9 +14,11 @@ interface Props {
   /** O Ate atual, para marcar o atalho que ja esta aplicado. */
   selectedEnd: number | null;
   onPick: (endPage: number) => void;
+  /** Trava os atalhos enquanto o registro esta sendo enviado (F4-18). */
+  disabled?: boolean;
 }
 
-export function QuickRange({ shortcuts, selectedEnd, onPick }: Props) {
+export function QuickRange({ shortcuts, selectedEnd, onPick, disabled = false }: Props) {
   return (
     <View style={styles.row}>
       {shortcuts.map((s) => (
@@ -24,6 +26,7 @@ export function QuickRange({ shortcuts, selectedEnd, onPick }: Props) {
           key={s.label}
           label={s.label}
           selected={selectedEnd === s.endPage}
+          disabled={disabled}
           onPress={() => onPick(s.endPage)}
         />
       ))}

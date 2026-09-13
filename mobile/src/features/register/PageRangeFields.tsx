@@ -13,9 +13,13 @@ interface Props {
   totalPages: number;
   /** Dica embaixo do De, so enquanto ele ainda e o valor pre-preenchido. */
   startHint: string | null;
+  /** Trava os dois campos enquanto o registro esta sendo enviado (F4-18). */
+  disabled?: boolean;
 }
 
-export function PageRangeFields({ start, end, onChangeStart, onChangeEnd, totalPages, startHint }: Props) {
+export function PageRangeFields({
+  start, end, onChangeStart, onChangeEnd, totalPages, startHint, disabled = false,
+}: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
@@ -24,6 +28,7 @@ export function PageRangeFields({ start, end, onChangeStart, onChangeEnd, totalP
           value={start}
           onChange={onChangeStart}
           max={totalPages}
+          disabled={disabled}
           accessibilityLabel="Página inicial"
         />
         <PageField
@@ -32,6 +37,7 @@ export function PageRangeFields({ start, end, onChangeStart, onChangeEnd, totalP
           onChange={onChangeEnd}
           max={totalPages}
           autoFocus
+          disabled={disabled}
           accessibilityLabel="Página final"
         />
       </View>

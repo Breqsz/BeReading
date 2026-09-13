@@ -1,5 +1,5 @@
 import { render, fireEvent, act, waitFor, within } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { BackHandler, Keyboard, StyleSheet } from 'react-native';
 
 // O Skeleton do carregamento usa useReducedMotion, que o mock oficial nao
 // traz (mesma sobrescrita local de home.test.tsx).
@@ -11,9 +11,18 @@ jest.mock('react-native-reanimated', () => {
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 let mockParams: { bookId?: string } = {};
+// Opcoes que a tela passa para a propria rota via <Stack.Screen options>, na
+// ordem de render: a ultima e a que vale.
+const mockStackOptions: { gestureEnabled?: boolean }[] = [];
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, back: mockBack, push: jest.fn() }),
   useLocalSearchParams: () => mockParams,
+  Stack: {
+    Screen: ({ options }: { options?: { gestureEnabled?: boolean } }) => {
+      mockStackOptions.push(options ?? {});
+      return null;
+    },
+  },
 }));
 
 jest.mock('expo-haptics', () => ({
@@ -110,6 +119,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockParams = {};
   mockCurrentBook = null;
+  mockStackOptions.length = 0;
 
   mGetStudentBooks.mockReset();
   mGetBookWithChapters.mockReset();
@@ -273,6 +283,8 @@ describe('registrar leitura: resultado', () => {
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledWith('u1'));
     expect(mRegister).toHaveBeenCalledWith('u1', 'b1', 85, 140);
     expect(mockReplace).not.toHaveBeenCalled();
+    // F4-18: o "pronto" que a mao sente so vem quando o sheet ja vai sair.
+    expect(mNotification).not.toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success);
 
     await act(async () => {
       liberarRefresh();
@@ -316,6 +328,7 @@ describe('registrar leitura: resultado', () => {
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledWith('u1'));
     expect(mockBack).not.toHaveBeenCalled();
     expect(queryByText('12 páginas registradas')).toBeNull();
+    expect(mNotification).not.toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success);
 
     await act(async () => {
       liberarRefresh();
@@ -487,5 +500,227 @@ describe('registrar leitura: estados', () => {
       </ToastProvider>,
     );
     expect((await findByLabelText('Página inicial')).props.value).toBe('21');
+  });
+});
+
+
+// Rodada de correcao 1 (Ruling F4-18 e Relevante 1 da revisao da Tarefa 5).
+describe('registrar leitura: durante e depois do envio', () => {
+  const espioes: jest.SpyInstance[] = [];
+  afterEach(() => {
+    espioes.splice(0).forEach((e) => e.mockRestore());
+  });
+
+  /** Envio que so termina quando o teste manda. */
+  function envioPendente() {
+    let resolver: (r: RegisterReadingResponse) => void = () => {};
+    let rejeitar: (e: Error) => void = () => {};
+    mRegister.mockImplementation(
+      () =>
+        new Promise<RegisterReadingResponse>((res, rej) => {
+          resolver = res;
+          rejeitar = rej;
+        }),
+    );
+    return {
+      resolver: (r: RegisterReadingResponse) => resolver(r),
+      rejeitar: (e: Error) => rejeitar(e),
+    };
+  }
+
+  const ultimaOpcao = () => mockStackOptions[mockStackOptions.length - 1];
+
+  // Relevante 1: o Ate abre em foco e o toque no CTA nao fecha o teclado
+  // (keyboardShouldPersistTaps). Com o number pad aberto, o toast de erro,
+  // a ~110 pt do fundo, fica atras da janela do teclado.
+  it('fecha o teclado antes de enviar', async () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    espioes.push(dismiss);
+    mRegister.mockRejectedValueOnce(new Error('falhou'));
+
+    const { getByLabelText, getByRole, findByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    expect(dismiss).not.toHaveBeenCalled();
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+
+    await findByText('Não deu pra registrar sua leitura.');
+    expect(dismiss).toHaveBeenCalled();
+    expect(dismiss.mock.invocationCallOrder[0]).toBeLessThan(mRegister.mock.invocationCallOrder[0]);
+  });
+
+  it('enquanto envia, o sheet nao fecha por gesto; depois da falha, volta a fechar', async () => {
+    const envio = envioPendente();
+    const { getByLabelText, getByRole, findByText } = await abrir();
+    expect(ultimaOpcao()).toEqual({ gestureEnabled: true });
+
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+    expect(ultimaOpcao()).toEqual({ gestureEnabled: false });
+
+    await act(async () => {
+      envio.rejeitar(new Error('falhou'));
+    });
+    await findByText('Não deu pra registrar sua leitura.');
+    expect(ultimaOpcao()).toEqual({ gestureEnabled: true });
+  });
+
+  it('enquanto envia, o voltar do Android nao fecha o sheet', async () => {
+    const registros: { handler: () => boolean | null | undefined; ativo: boolean }[] = [];
+    espioes.push(
+      jest.spyOn(BackHandler, 'addEventListener').mockImplementation((evento, handler) => {
+        const registro = { handler, ativo: evento === 'hardwareBackPress' };
+        registros.push(registro);
+        return { remove: () => { registro.ativo = false; } };
+      }),
+    );
+    const ativos = () => registros.filter((r) => r.ativo);
+
+    const envio = envioPendente();
+    const { getByLabelText, getByRole, findByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    expect(ativos()).toHaveLength(0);
+
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+    expect(ativos()).toHaveLength(1);
+    // true = "tratei o voltar": a navegacao nao desempilha o sheet.
+    expect(ativos()[0].handler()).toBe(true);
+
+    await act(async () => {
+      envio.rejeitar(new Error('falhou'));
+    });
+    await findByText('Não deu pra registrar sua leitura.');
+    expect(ativos()).toHaveLength(0);
+  });
+
+  it('enquanto envia, Trocar, campos e atalhos ficam desabilitados, e voltam depois da falha', async () => {
+    mGetStudentBooks.mockResolvedValue([entry({ current_page: 84 }), entry({ current_page: 40 }, DOM_CASMURRO)]);
+    const envio = envioPendente();
+    const { getByLabelText, getByRole, queryByRole, findByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+
+    const trocar = getByRole('button', { name: 'Trocar livro' });
+    expect(trocar.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    fireEvent.press(trocar);
+    expect(queryByRole('button', { name: 'Escolher Dom Casmurro' })).toBeNull();
+
+    const mais10 = getByRole('button', { name: '+10' });
+    expect(mais10.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    fireEvent.press(mais10);
+    expect(getByLabelText('Página final').props.value).toBe('112');
+
+    expect(getByLabelText('Página inicial').props.editable).toBe(false);
+    expect(getByLabelText('Página final').props.editable).toBe(false);
+    fireEvent.changeText(getByLabelText('Página inicial'), '1');
+    expect(getByLabelText('Página inicial').props.value).toBe('85');
+
+    await act(async () => {
+      envio.rejeitar(new Error('falhou'));
+    });
+    await findByText('Não deu pra registrar sua leitura.');
+    expect(getByRole('button', { name: 'Trocar livro' }).props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
+    expect(getByRole('button', { name: '+10' }).props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
+    expect(getByLabelText('Página final').props.editable).not.toBe(false);
+    // O que o toast promete ("continua aqui") e verdade.
+    expect(getByLabelText('Página inicial').props.value).toBe('85');
+    expect(getByLabelText('Página final').props.value).toBe('112');
+  });
+
+  it('sheet fechado no meio do envio, com capitulo na resposta: nao navega, e confirma o registro', async () => {
+    const envio = envioPendente();
+    const { getByLabelText, getByRole, rerender, findByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+
+    rerender(<ToastProvider>{null}</ToastProvider>);
+    await act(async () => {
+      envio.resolver(resposta({ completed_chapter_ids: ['c-4'] }));
+    });
+
+    expect(await findByText('28 páginas registradas')).toBeTruthy();
+    expect(mockRefresh).toHaveBeenCalledWith('u1');
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('sheet fechado no meio do envio, sem capitulo: nao chama back(), e confirma o registro', async () => {
+    const envio = envioPendente();
+    const { getByLabelText, getByRole, rerender, findByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '96');
+    fireEvent.press(getByRole('button', { name: 'Registrar 12 páginas' }));
+
+    rerender(<ToastProvider>{null}</ToastProvider>);
+    await act(async () => {
+      envio.resolver(resposta({ completed_chapter_ids: [] }));
+    });
+
+    expect(await findByText('12 páginas registradas')).toBeTruthy();
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('"Tentar" depois de a tela sair nao reenvia', async () => {
+    mRegister.mockRejectedValueOnce(new Error('falhou'));
+    const { getByLabelText, getByRole, rerender, findByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+    await findByText('Não deu pra registrar sua leitura.');
+
+    rerender(<ToastProvider>{null}</ToastProvider>);
+    fireEvent.press(getByRole('button', { name: 'Tentar' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mRegister).toHaveBeenCalledTimes(1);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('falha depois de a tela sair: avisa o erro, sem oferecer "Tentar" nem prometer campo guardado', async () => {
+    const envio = envioPendente();
+    const { getByLabelText, getByRole, rerender, findByText, queryByRole, queryByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+
+    rerender(<ToastProvider>{null}</ToastProvider>);
+    await act(async () => {
+      envio.rejeitar(new Error('falhou'));
+    });
+
+    expect(await findByText('Não deu pra registrar sua leitura.')).toBeTruthy();
+    expect(queryByRole('button', { name: 'Tentar' })).toBeNull();
+    expect(queryByText('O que você digitou continua aqui.')).toBeNull();
+  });
+
+  // Mesmo defeito do Menor 10 por outra porta: com a lista de livros ja aberta
+  // quando o CTA e tocado, escolher outro livro no meio do envio zerava os
+  // campos que o toast de erro promete guardar.
+  it('com a lista de livros aberta, as linhas dela tambem travam enquanto envia', async () => {
+    mGetStudentBooks.mockResolvedValue([entry({ current_page: 84 }), entry({ current_page: 40 }, DOM_CASMURRO)]);
+    const envio = envioPendente();
+    const { getByLabelText, getByRole, findByText } = await abrir();
+    fireEvent.press(getByRole('button', { name: 'Trocar livro' }));
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    fireEvent.press(getByRole('button', { name: 'Registrar 28 páginas' }));
+
+    const linha = getByRole('button', { name: 'Escolher Dom Casmurro' });
+    expect(linha.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    fireEvent.press(linha);
+    expect(getByLabelText('Página inicial').props.value).toBe('85');
+    expect(getByLabelText('Página final').props.value).toBe('112');
+
+    await act(async () => {
+      envio.rejeitar(new Error('falhou'));
+    });
+    await findByText('Não deu pra registrar sua leitura.');
+    expect(getByRole('button', { name: 'Escolher Dom Casmurro' }).props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
+    expect(getByLabelText('Página final').props.value).toBe('112');
   });
 });

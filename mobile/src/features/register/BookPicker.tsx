@@ -11,9 +11,14 @@ interface Props {
   choices: BookChoice[];
   selectedId: string;
   onChoose: (choice: BookChoice) => void;
+  /**
+   * Trava as linhas enquanto o registro esta sendo enviado (F4-18): trocar de
+   * livro no meio zeraria os campos que o toast de erro promete guardar.
+   */
+  disabled?: boolean;
 }
 
-export function BookPicker({ choices, selectedId, onChoose }: Props) {
+export function BookPicker({ choices, selectedId, onChoose, disabled = false }: Props) {
   return (
     <View>
       {choices.map((choice, i) => (
@@ -31,6 +36,7 @@ export function BookPicker({ choices, selectedId, onChoose }: Props) {
             ) : null
           }
           onPress={() => onChoose(choice)}
+          disabled={disabled}
           accessibilityLabel={`Escolher ${choice.book.title}`}
           last={i === choices.length - 1}
         />

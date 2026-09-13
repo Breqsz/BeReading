@@ -11,9 +11,15 @@ interface Props {
   /** Total de paginas do livro: define quantos digitos cabem. */
   max?: number;
   accessibilityLabel: string;
+  /**
+   * Abre com o cursor no campo. O Field ja repassa toda prop de TextInput; o
+   * PageField nao repassava nenhuma, e o sheet de registro precisa do "Ate"
+   * em foco (spec S7.2).
+   */
+  autoFocus?: boolean;
 }
 
-export function PageField({ label, value, onChange, placeholder, max, accessibilityLabel }: Props) {
+export function PageField({ label, value, onChange, placeholder, max, accessibilityLabel, autoFocus }: Props) {
   const [focused, setFocused] = useState(false);
   const maxLength = max ? String(max).length : 4;
 
@@ -31,6 +37,7 @@ export function PageField({ label, value, onChange, placeholder, max, accessibil
           placeholder={placeholder}
           placeholderTextColor={color.text3}
           keyboardType="number-pad"
+          autoFocus={autoFocus}
           maxLength={maxLength}
           style={styles.input}
         />

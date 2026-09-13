@@ -84,6 +84,13 @@ describe('PageField', () => {
     expect(getByLabelText('Página inicial').props.keyboardType).toBe('number-pad');
   });
 
+  it('abre em foco quando pedido: o sheet de registro poe o cursor no Ate', () => {
+    const { getByLabelText } = render(
+      <PageField label="Até" value="" onChange={jest.fn()} autoFocus accessibilityLabel="Página final" />,
+    );
+    expect(getByLabelText('Página final').props.autoFocus).toBe(true);
+  });
+
   it('limita o tamanho pelo total de paginas do livro', () => {
     const { getByLabelText } = render(
       <PageField label="Até" value="" onChange={jest.fn()} max={215} accessibilityLabel="Página final" />,

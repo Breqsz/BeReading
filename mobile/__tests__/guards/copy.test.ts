@@ -28,29 +28,33 @@ const VIGIADAS = [...VIGIADAS_COM_CONTEUDO, 'src/features'];
 const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types', 'src/utils', 'src/theme'];
 
 /**
- * As telas antigas de `app/` que ainda nao migraram. Mesma lista e mesmo
- * raciocinio de designTokens.test.ts (arquivo inteiro fica de fora ate ser
- * reescrito, porque a reescrita troca a tela inteira). Repetida aqui porque
- * cada guarda deste diretorio e standalone — ver aquele arquivo pro
- * raciocinio completo de quem entra e quem fica de fora (chapter-complete,
- * reading-success e os tres _layout.tsx nao entram).
+ * Rodada de correcao 1 (revisao da Tarefa 1): a lista unica
+ * `EXCECAO_APP_LEGADO`, compartilhada pelas tres guardas, isentava arquivo
+ * inteiro de emoji E travessao mesmo quando ele so violava um dos dois (ou
+ * nenhum). Trocada por uma lista por checagem — ver designTokens.test.ts pro
+ * raciocinio completo. Cada lista abaixo e local a este arquivo: nenhuma das
+ * duas e usada por designTokens.test.ts nem a11y.test.ts, entao nao ha copia
+ * cruzada pra decidir manter em modulo compartilhado (ver nota antes do
+ * describe de tripwire, mais abaixo).
+ *
+ * chapter-complete.tsx, reading-success.tsx (fora desta, ver linha da
+ * excecao) e os tres _layout.tsx nao entram: nao violam nem emoji nem
+ * travessao.
  */
-const EXCECAO_APP_LEGADO = new Set([
-  'app/(auth)/confirm-email.tsx',
-  'app/(auth)/login.tsx',
-  'app/(auth)/signup.tsx',
+const EXCECAO_EMOJI = new Set([
   'app/(tabs)/catalogo.tsx',
   'app/(tabs)/index.tsx',
-  'app/(tabs)/livros.tsx',
-  'app/(tabs)/perfil.tsx',
+  'app/book/[id].tsx',
+  'app/quiz/[chapterId].tsx',
+]);
+
+const EXCECAO_TRAVESSAO = new Set([
+  'app/(auth)/login.tsx',
+  'app/(tabs)/index.tsx',
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
   'app/register-reading.tsx',
-  // Volta da F3: o redirect que substituiu esta tela apagou a confirmacao do
-  // caminho mais comum do app. Sai da lista quando a F4 Tarefa 5 apagar o
-  // arquivo.
-  'app/reading-success.tsx',
 ]);
 
 /**
@@ -105,13 +109,13 @@ describe('guarda: copy', () => {
   });
 
   it.each(TODOS)('%s nao tem emoji', (rel) => {
-    if (EXCECAO_APP_LEGADO.has(rel)) return;
+    if (EXCECAO_EMOJI.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(EMOJI.test(codigo)).toBe(false);
   });
 
   it.each(TODOS)('%s nao tem travessao em codigo', (rel) => {
-    if (EXCECAO_APP_LEGADO.has(rel)) return;
+    if (EXCECAO_TRAVESSAO.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(TRAVESSAO.test(codigo)).toBe(false);
   });
@@ -122,9 +126,39 @@ describe('guarda: copy', () => {
  * arquivo listado deixar de existir, em vez de continuar "protegendo" uma
  * tela que ja migrou ou sumiu (lixo que finge cobertura).
  */
-describe('guarda: excecao de app/ legado nao aponta pra arquivo fantasma', () => {
-  it.each([...EXCECAO_APP_LEGADO])('excecao %s ainda existe', (rel) => {
-    expect(existsSync(join(RAIZ, rel))).toBe(true);
+describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
+  it.each([...EXCECAO_EMOJI, ...EXCECAO_TRAVESSAO].filter((v, i, arr) => arr.indexOf(v) === i))(
+    'excecao %s ainda existe',
+    (rel) => {
+      expect(existsSync(join(RAIZ, rel))).toBe(true);
+    },
+  );
+});
+
+/**
+ * Tripwire inverso (a parte que resolve o problema de verdade, ver
+ * designTokens.test.ts pro raciocinio completo): cada arquivo isento precisa
+ * provar, a cada rodada, que AINDA viola a checagem que o isenta. Sem isso a
+ * lista so encolhe se alguem lembrar quando a Tarefa 4/5/6 reescrever a tela
+ * — o mesmo mecanismo que ja falhou nesta branch.
+ */
+describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', () => {
+  it.each([...EXCECAO_EMOJI])('%s: tripwire EXCECAO_EMOJI ainda tem emoji', (rel) => {
+    const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
+    if (!EMOJI.test(codigo)) {
+      throw new Error(
+        `${rel} nao tem mais emoji. Remova esta linha de EXCECAO_EMOJI em copy.test.ts: a excecao parou de proteger qualquer coisa.`,
+      );
+    }
+  });
+
+  it.each([...EXCECAO_TRAVESSAO])('%s: tripwire EXCECAO_TRAVESSAO ainda tem travessao em codigo', (rel) => {
+    const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
+    if (!TRAVESSAO.test(codigo)) {
+      throw new Error(
+        `${rel} nao tem mais travessao em codigo. Remova esta linha de EXCECAO_TRAVESSAO em copy.test.ts: a excecao parou de proteger qualquer coisa.`,
+      );
+    }
   });
 });
 

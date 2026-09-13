@@ -36,30 +36,23 @@ const PASTAS_DO_REDESIGN = ['src/ui', 'src/assistant', 'src/game', 'src/features
 const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types', 'src/utils', 'src/theme'];
 
 /**
- * As telas antigas de `app/` que ainda nao migraram. Mesma lista e mesmo
- * raciocinio de designTokens.test.ts. Repetida aqui porque cada guarda deste
- * diretorio e standalone. Nem toda entrada tem Pressable sem label (por
- * exemplo app/(auth)/login.tsx nao usa Pressable) — mas a excecao e sobre o
- * ARQUIVO como divida de migracao inteira, nao sobre a violacao pontual, e
- * pra quem nao tem Pressable a linha e inofensiva (o teste so roda de
- * verdade quando acha <Pressable ou AnimatedPressable).
+ * Rodada de correcao 1 (revisao da Tarefa 1): a lista unica
+ * `EXCECAO_APP_LEGADO`, compartilhada pelas tres guardas, isentava arquivo
+ * que nem tem Pressable no arquivo (por exemplo login.tsx e livros.tsx) — a
+ * checagem abaixo ja e um no-op pra eles (so roda de verdade quando acha
+ * <Pressable ou AnimatedPressable), entao mante-los na lista so escondia
+ * cobertura sem precisar. Trocada por uma lista com SO os arquivos que hoje
+ * tem Pressable sem accessibilityRole/accessibilityLabel — ver
+ * designTokens.test.ts pro raciocinio completo da mudanca.
  */
-const EXCECAO_APP_LEGADO = new Set([
+const EXCECAO_A11Y = new Set([
   'app/(auth)/confirm-email.tsx',
-  'app/(auth)/login.tsx',
   'app/(auth)/signup.tsx',
   'app/(tabs)/catalogo.tsx',
-  'app/(tabs)/index.tsx',
-  'app/(tabs)/livros.tsx',
   'app/(tabs)/perfil.tsx',
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
-  'app/quiz/summary.tsx',
   'app/register-reading.tsx',
-  // Volta da F3: o redirect que substituiu esta tela apagou a confirmacao do
-  // caminho mais comum do app. Sai da lista quando a F4 Tarefa 5 apagar o
-  // arquivo.
-  'app/reading-success.tsx',
 ]);
 
 function arquivos(dir: string): string[] {
@@ -95,7 +88,7 @@ describe('guarda: acessibilidade', () => {
   });
 
   it.each(TODOS)('%s: se tem Pressable, declara role e label', (rel) => {
-    if (EXCECAO_APP_LEGADO.has(rel)) return;
+    if (EXCECAO_A11Y.has(rel)) return;
     const conteudo = readFileSync(join(RAIZ, rel), 'utf8');
     if (!/<Pressable|AnimatedPressable/.test(conteudo)) return;
     expect(conteudo).toMatch(/accessibilityRole=/);
@@ -108,9 +101,30 @@ describe('guarda: acessibilidade', () => {
  * arquivo listado deixar de existir, em vez de continuar "protegendo" uma
  * tela que ja migrou ou sumiu (lixo que finge cobertura).
  */
-describe('guarda: excecao de app/ legado nao aponta pra arquivo fantasma', () => {
-  it.each([...EXCECAO_APP_LEGADO])('excecao %s ainda existe', (rel) => {
+describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
+  it.each([...EXCECAO_A11Y])('excecao %s ainda existe', (rel) => {
     expect(existsSync(join(RAIZ, rel))).toBe(true);
+  });
+});
+
+/**
+ * Tripwire inverso (a parte que resolve o problema de verdade, ver
+ * designTokens.test.ts pro raciocinio completo): cada arquivo isento precisa
+ * provar, a cada rodada, que AINDA tem Pressable sem role/label. Sem isso a
+ * lista so encolhe se alguem lembrar quando a Tarefa 4/5/6 reescrever a tela
+ * — o mesmo mecanismo que ja falhou nesta branch.
+ */
+describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', () => {
+  it.each([...EXCECAO_A11Y])('%s: tripwire EXCECAO_A11Y ainda tem Pressable sem role/label', (rel) => {
+    const conteudo = readFileSync(join(RAIZ, rel), 'utf8');
+    const temPressable = /<Pressable|AnimatedPressable/.test(conteudo);
+    const temRole = /accessibilityRole=/.test(conteudo);
+    const temLabel = /accessibilityLabel[=:]/.test(conteudo);
+    if (!(temPressable && !(temRole && temLabel))) {
+      throw new Error(
+        `${rel} nao tem mais Pressable sem accessibilityRole/accessibilityLabel. Remova esta linha de EXCECAO_A11Y em a11y.test.ts: a excecao parou de proteger qualquer coisa.`,
+      );
+    }
   });
 });
 

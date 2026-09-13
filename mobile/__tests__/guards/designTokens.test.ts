@@ -56,30 +56,30 @@ const EXCECOES_COR = new Set([
 ]);
 
 /**
- * As 13 telas do "Luminous Library" anterior que moram em `app/` (a
- * contagem exclui os _layout.tsx de rota, que sao config de navegacao, nao
- * tela) ainda nao migraram pro design novo — migram uma a uma, ate a F6.
- * Cada entrada aqui e divida DECLARADA: o arquivo inteiro fica de fora das
- * tres guardas deste diretorio ate ser reescrito, porque a reescrita troca a
- * tela inteira (cor, tipografia, feedback juntos), nao um literal de cada
- * vez — diferente de EXCECOES_COR acima, que e uma excecao pontual e
- * permanente (alpha sobre capa), esta e temporal e so encolhe.
+ * Rodada de correcao 1 (revisao da Tarefa 1) trocou a lista unica
+ * `EXCECAO_APP_LEGADO`, compartilhada pelas tres guardas, por uma lista POR
+ * CHECAGEM: quase nenhum arquivo do "Luminous Library" anterior viola as
+ * cinco checagens ao mesmo tempo (cor, tipografia, feedback, emoji,
+ * travessao, a11y), e isentar o arquivo inteiro escondia checagens que ele
+ * ja passava de qualquer jeito — dois arquivos podiam ganhar Alert.alert e
+ * ate seis podiam ganhar emoji sem a suite acusar nada. Mesmo raciocinio de
+ * `EXCECOES_COR` acima (excecao por categoria, nao por arquivo), agora
+ * aplicado tambem a divida de migracao.
  *
- * app/chapter-complete.tsx e app/reading-success.tsx (F3) NAO entram: sao
- * novos e limpos, e por isso respondem pela guarda como qualquer arquivo de
- * VIGIADAS. app/_layout.tsx, app/(auth)/_layout.tsx e app/(tabs)/_layout.tsx
- * (tambem tocados na F3) tambem ficam de fora: nenhum tinha cor, fontSize ou
- * Alert.alert literal de verdade (o unico achado bruto era um travessao
- * dentro de um comentario JSX de app/(tabs)/_layout.tsx, corrigido no
- * arquivo em vez de virar excecao).
+ * Cada lista abaixo contem SO os arquivos que hoje realmente violam aquela
+ * checagem especifica (conferido rodando a checagem, nao por inspecao). Cada
+ * entrada e divida DECLARADA e temporal: sai da lista quando a tela for
+ * reescrita e a violacao desaparecer (nunca antes, e o tripwire logo abaixo
+ * do describe de cada guarda barra a saida cedo demais).
  *
- * Lista compartilhada pelas tres guardas deste diretorio. Ela so encolhe: ao
- * migrar uma tela, tire a entrada daqui, nao adicione.
+ * app/chapter-complete.tsx e app/reading-success.tsx (F3) NAO entram em
+ * nenhuma: sao novos e limpos, e por isso respondem pela guarda como
+ * qualquer arquivo de VIGIADAS. app/_layout.tsx, app/(auth)/_layout.tsx e
+ * app/(tabs)/_layout.tsx (tambem tocados na F3) tambem ficam de fora: nenhum
+ * tinha cor, fontSize ou Alert.alert literal de verdade.
  */
-const EXCECAO_APP_LEGADO = new Set([
+const EXCECAO_COR = new Set([
   'app/(auth)/confirm-email.tsx',
-  'app/(auth)/login.tsx',
-  'app/(auth)/signup.tsx',
   'app/(tabs)/catalogo.tsx',
   'app/(tabs)/index.tsx',
   'app/(tabs)/livros.tsx',
@@ -87,11 +87,27 @@ const EXCECAO_APP_LEGADO = new Set([
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
-  'app/register-reading.tsx',
   // Volta da F3: o redirect que substituiu esta tela apagou a confirmacao do
   // caminho mais comum do app. Sai da lista quando a F4 Tarefa 5 apagar o
   // arquivo.
   'app/reading-success.tsx',
+  'app/register-reading.tsx',
+]);
+
+/**
+ * Todo arquivo de EXCECAO_COR mais os dois (auth) que so violam tipografia:
+ * login.tsx e signup.tsx nao tem cor literal, mas tem fontSize/fontFamily
+ * solto.
+ */
+const EXCECAO_TIPOGRAFIA = new Set([...EXCECAO_COR, 'app/(auth)/login.tsx', 'app/(auth)/signup.tsx']);
+
+const EXCECAO_FEEDBACK = new Set([
+  'app/(auth)/confirm-email.tsx',
+  'app/(auth)/login.tsx',
+  'app/(auth)/signup.tsx',
+  'app/(tabs)/catalogo.tsx',
+  'app/quiz/[chapterId].tsx',
+  'app/register-reading.tsx',
 ]);
 
 function arquivos(dir: string): string[] {
@@ -150,7 +166,7 @@ describe('guarda: cor', () => {
 
   it.each(TODOS)('%s nao tem cor literal fora dos tokens', (rel) => {
     if (EXCECOES_COR.has(rel)) return;
-    if (EXCECAO_APP_LEGADO.has(rel)) return;
+    if (EXCECAO_COR.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     const achados = codigo.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [];
     expect(achados).toEqual([]);
@@ -163,10 +179,10 @@ describe('guarda: tipografia', () => {
   // isencao nao protegia nada e, pior, escondia justamente o arquivo que existe
   // pra acabar com os tamanhos soltos do app antigo. Se um dia precisar mesmo
   // de literal, a guarda acusa e a excecao volta nominal, com motivo escrito
-  // (mesma regra do EXCECOES_COR). EXCECAO_APP_LEGADO e diferente: e divida
+  // (mesma regra do EXCECOES_COR). EXCECAO_TIPOGRAFIA e diferente: e divida
   // de migracao, nao decisao de design, e por isso vale aqui tambem.
   it.each(TODOS)('%s nao tem fontSize nem fontFamily literal', (rel) => {
-    if (EXCECAO_APP_LEGADO.has(rel)) return;
+    if (EXCECAO_TIPOGRAFIA.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(codigo).not.toMatch(/fontSize:\s*\d/);
     expect(codigo).not.toMatch(/fontFamily:\s*['"]/);
@@ -175,7 +191,7 @@ describe('guarda: tipografia', () => {
 
 describe('guarda: feedback', () => {
   it.each(TODOS)('%s nao usa Alert.alert', (rel) => {
-    if (EXCECAO_APP_LEGADO.has(rel)) return;
+    if (EXCECAO_FEEDBACK.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(codigo).not.toMatch(/Alert\.alert/);
   });
@@ -188,9 +204,55 @@ describe('guarda: feedback', () => {
  * Isso apodrece ao longo de seis fases se ninguem checar. Este teste falha
  * assim que um arquivo listado deixar de existir.
  */
-describe('guarda: excecao de app/ legado nao aponta pra arquivo fantasma', () => {
-  it.each([...EXCECAO_APP_LEGADO])('excecao %s ainda existe', (rel) => {
-    expect(existsSync(join(RAIZ, rel))).toBe(true);
+describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
+  it.each([...EXCECAO_COR, ...EXCECAO_TIPOGRAFIA, ...EXCECAO_FEEDBACK].filter((v, i, arr) => arr.indexOf(v) === i))(
+    'excecao %s ainda existe',
+    (rel) => {
+      expect(existsSync(join(RAIZ, rel))).toBe(true);
+    },
+  );
+});
+
+/**
+ * O tripwire inverso, que e a metade que realmente resolve o problema: sem
+ * ele, a lista so encolhe se alguem lembrar de tirar a entrada quando a tela
+ * for reescrita — exatamente o mecanismo que ja falhou nesta branch (revisao
+ * da Tarefa 1). Cada arquivo isento precisa provar, a cada rodada da suite,
+ * que AINDA viola a checagem que o isenta. No dia que a Tarefa 4, 5 ou 6
+ * reescrever a tela e a violacao sumir, este teste vira vermelho na hora —
+ * nao silencioso — com uma mensagem que diz o arquivo, a checagem e a acao
+ * (tirar da lista), em vez de deixar a excecao "proteger" uma tela que ja
+ * ficou limpa.
+ */
+describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', () => {
+  it.each([...EXCECAO_COR])('%s: tripwire EXCECAO_COR ainda tem cor literal fora dos tokens', (rel) => {
+    const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
+    const achados = codigo.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [];
+    if (achados.length === 0) {
+      throw new Error(
+        `${rel} nao tem mais cor literal fora dos tokens. Remova esta linha de EXCECAO_COR em designTokens.test.ts: a excecao parou de proteger qualquer coisa.`,
+      );
+    }
+  });
+
+  it.each([...EXCECAO_TIPOGRAFIA])('%s: tripwire EXCECAO_TIPOGRAFIA ainda tem fontSize ou fontFamily literal', (rel) => {
+    const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
+    const violaFontSize = /fontSize:\s*\d/.test(codigo);
+    const violaFontFamily = /fontFamily:\s*['"]/.test(codigo);
+    if (!violaFontSize && !violaFontFamily) {
+      throw new Error(
+        `${rel} nao tem mais fontSize/fontFamily literal. Remova esta linha de EXCECAO_TIPOGRAFIA em designTokens.test.ts: a excecao parou de proteger qualquer coisa.`,
+      );
+    }
+  });
+
+  it.each([...EXCECAO_FEEDBACK])('%s: tripwire EXCECAO_FEEDBACK ainda usa Alert.alert', (rel) => {
+    const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
+    if (!/Alert\.alert/.test(codigo)) {
+      throw new Error(
+        `${rel} nao usa mais Alert.alert. Remova esta linha de EXCECAO_FEEDBACK em designTokens.test.ts: a excecao parou de proteger qualquer coisa.`,
+      );
+    }
   });
 });
 

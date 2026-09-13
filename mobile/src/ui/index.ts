@@ -18,3 +18,7 @@ export { ToastProvider, useToast } from './Toast';
 export type { ToastOptions } from './Toast';
 export { TabBar, TAB_BAR_HEIGHT } from './TabBar';
 export { Screen } from './Screen';
+// Vive em src/assistant (e' a cara do assistente, ao lado de persona.ts e
+// lines.ts), mas exporta por aqui tambem para o src/ui ser a superficie
+// unica de import dos primitivos visuais.
+export { Glyph, GLYPH_PATH, GLYPH_VIEWBOX, GLYPH_EYES, GLYPH_EYE_RADIUS } from '../assistant/Glyph';

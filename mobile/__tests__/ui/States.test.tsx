@@ -3,7 +3,7 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { Text as RNText } from 'react-native';
 import { Skeleton } from '../../src/ui/Skeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
-import { Banner } from '../../src/ui/Banner';
+import { Banner, type BannerTone } from '../../src/ui/Banner';
 import { ListRow } from '../../src/ui/ListRow';
 import { MIN_TOUCH, color } from '../../src/theme/tokens';
 
@@ -108,12 +108,21 @@ describe('Banner', () => {
     expect(queryByRole('button')).toBeNull();
   });
 
-  it.each([
+  // Duas variantes, nao tres (DESIGN.md secao 5). O `positive` saiu daqui junto
+  // com a prop: banner e persistente e "some quando a causa e corrigida", e
+  // sucesso nao tem causa a corrigir.
+  //
+  // Sem `as const` e sem `satisfies`, o it.each infere `string` e a unica forma
+  // de compilar seria um `as any` no `tone` — que era o que estava aqui, e que
+  // anulava exatamente a checagem que importa. Com o tipo preservado, escrever
+  // 'positive' de volta nesta tabela para de compilar.
+  const TONS = [
     ['danger', color.dangerSoft, color.danger],
-    ['positive', color.positiveSoft, color.positive],
     ['info', color.surface1, color.line],
-  ])('o tom %s pinta fundo e borda com o par certo', (tone, bg, border) => {
-    const { getByRole } = render(<Banner tone={tone as any} message="Aviso" />);
+  ] as const satisfies readonly (readonly [BannerTone, string, string])[];
+
+  it.each(TONS)('o tom %s pinta fundo e borda com o par certo', (tone, bg, border) => {
+    const { getByRole } = render(<Banner tone={tone} message="Aviso" />);
     const estilo = StyleSheet.flatten(getByRole('alert').props.style);
     expect(estilo.backgroundColor).toBe(bg);
     expect(estilo.borderColor).toBe(border);

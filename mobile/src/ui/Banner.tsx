@@ -2,18 +2,28 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text, STATUS_TONE, type Status } from './Text';
 import { color, radius, space } from '../theme/tokens';
 
+/**
+ * Duas variantes, nao tres (DESIGN.md secao 5). O Banner usa o vocabulario de
+ * `Status`, mas nao os tres valores dele: `positive` fica de fora de proposito.
+ *
+ * O motivo esta na propria regra de saida do componente: o Banner e persistente,
+ * "some quando a causa e corrigida". Sucesso nao tem causa a corrigir. Um banner
+ * verde seria o unico elemento do sistema sem regra coerente de quando sair.
+ * Sucesso e transitorio, e transitorio e Toast.
+ */
+export type BannerTone = Exclude<Status, 'positive'>;
+
 interface Props {
-  tone: Status;
+  tone: BannerTone;
   message: string;
   onRetry?: () => void;
 }
 
-// Fundo e borda por estado, nos mesmos pares macio/solido do resto do
-// sistema (dangerSoft/danger, positiveSoft/positive). "info" nao e alerta,
-// entao fica na superficie neutra em vez de um par soft/solid proprio.
-const BANNER_TONE: Record<Status, { bg: string; border: string }> = {
+// Fundo e borda por estado, no mesmo par macio/solido do resto do sistema
+// (dangerSoft/danger). "info" nao e alerta, entao fica na superficie neutra em
+// vez de um par soft/solid proprio.
+const BANNER_TONE: Record<BannerTone, { bg: string; border: string }> = {
   danger: { bg: color.dangerSoft, border: color.danger },
-  positive: { bg: color.positiveSoft, border: color.positive },
   info: { bg: color.surface1, border: color.line },
 };
 

@@ -20,6 +20,7 @@ import {
   getMyAnswers,
   getBooks,
 } from '../../src/api/queries';
+import type { MyAnswer } from '../../src/api/queries';
 import type { Profile, Classroom, Book } from '../../src/types/database';
 
 const chain = (supabase as any).__chain;
@@ -106,7 +107,10 @@ describe('joinClassroom', () => {
 });
 
 describe('getMyAnswers', () => {
-  const mockAnswers = [
+  // Tipado como MyAnswer de proposito: fixture solta compila com campo
+  // faltando ou com nome errado, e o teste passa validando um formato que a
+  // consulta real nunca devolveria.
+  const mockAnswers: MyAnswer[] = [
     {
       id: 'a1',
       question_id: 'q1',

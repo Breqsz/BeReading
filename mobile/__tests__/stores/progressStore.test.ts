@@ -86,14 +86,25 @@ beforeEach(() => {
 });
 
 describe('useProgressStore', () => {
-  it('estado inicial é zerado', () => {
-    const state = useProgressStore.getState();
-    expect(state.sessions).toEqual([]);
-    expect(state.answers).toEqual([]);
-    expect(state.badges).toEqual([]);
-    expect(state.streak).toBeNull();
-    expect(state.xp).toBe(0);
-    expect(state.level).toEqual(levelFor(0));
+  // Este teste era vácuo: o `beforeEach` acima escreve INITIAL_STATE por
+  // `setState`, então ler o estado logo depois só confirma o que o próprio
+  // teste acabou de escrever. Um default errado em `create<ProgressState>(...)`
+  // passaria batido. Reimportar o módulo com o registro limpo é o que faz a
+  // pergunta certa: o que a store vale antes de alguém tocar nela.
+  it('os defaults da store, sem ninguém ter escrito nada, são zerados', () => {
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { useProgressStore: storeNova } = require('../../src/stores/progressStore');
+      const state = storeNova.getState();
+      expect(state.sessions).toEqual([]);
+      expect(state.answers).toEqual([]);
+      expect(state.badges).toEqual([]);
+      expect(state.streak).toBeNull();
+      expect(state.xp).toBe(0);
+      expect(state.level).toEqual(levelFor(0));
+      expect(state.previous).toBeNull();
+      expect(state.carregado).toBe(false);
+    });
   });
 
   it('refresh busca e guarda sessões, respostas, conquistas e sequência', async () => {
@@ -134,6 +145,44 @@ describe('useProgressStore', () => {
     const state = useProgressStore.getState();
     expect(state.xp).toBe(xpEsperado);
     expect(state.level).toEqual(levelFor(xpEsperado));
+  });
+
+  // As quatro consultas vão juntas num Promise.all. Se uma falhar (rede caindo
+  // no meio, RLS negando uma delas), o store não pode ficar com metade dos
+  // dados novos e metade dos velhos: a tela leria XP de um instante e sequência
+  // de outro. A leitura do código diz que está certo, porque a rejeição
+  // acontece antes de qualquer `set`. Isso é diferente de estar testado.
+  it('refresh que falha no meio não deixa o store pela metade', async () => {
+    mockedGetReadingSessions.mockResolvedValue([sessao(10)]);
+    mockedGetMyAnswers.mockResolvedValue([]);
+    mockedGetStudentBadges.mockResolvedValue([]);
+    mockedGetStreak.mockResolvedValue(streak);
+    await useProgressStore.getState().refresh('u1');
+
+    const antes = useProgressStore.getState();
+    const instantaneo = {
+      sessions: antes.sessions,
+      answers: antes.answers,
+      badges: antes.badges,
+      streak: antes.streak,
+      xp: antes.xp,
+      previous: antes.previous,
+    };
+
+    mockedGetReadingSessions.mockResolvedValue([sessao(10), sessao(30)]);
+    mockedGetStreak.mockRejectedValue(new Error('rede caiu'));
+
+    await expect(useProgressStore.getState().refresh('u1')).rejects.toThrow('rede caiu');
+
+    const depois = useProgressStore.getState();
+    expect({
+      sessions: depois.sessions,
+      answers: depois.answers,
+      badges: depois.badges,
+      streak: depois.streak,
+      xp: depois.xp,
+      previous: depois.previous,
+    }).toEqual(instantaneo);
   });
 
   describe('instantâneo anterior (previous)', () => {

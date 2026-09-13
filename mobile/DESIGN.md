@@ -122,6 +122,13 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
 - **Chip**: seleção de baixo compromisso (filtro, atalho de página). `radius.pill`. Estados:
   default (fundo transparente, borda `color.line2`); pressed; selected (invertido: fundo
   `color.text`, texto escuro — tinta clara com texto escuro, não `accentSoft`); disabled.
+- **Tag**: rótulo **estático**, o par informativo do Chip. Quatro usos: "+X XP" e "N dias
+  seguidos" na conquista, "nota · +XP" no quiz, gênero e páginas no detalhe do livro. `radius.tag`.
+  Não tem estado de interação porque **não é tocável**, e essa é a razão de existir dele: o Chip
+  exige `onPress` e se anuncia como botão, então usá-lo só para mostrar informação põe um botão
+  falso na árvore de acessibilidade. Cada tom é um par fundo mais tinta, dos que já existem
+  (`accentSoft`/`accent`, `positiveSoft`/`positive`, `dangerSoft`/`danger`), mais o neutro
+  (`surface2` + `color.text2`). Ícone opcional à esquerda, sempre decorativo.
 - **Segmented**: alternância entre poucas opções mutuamente exclusivas. Estados por segmento:
   default; pressed; selected (fundo `color.surface3`, texto `color.text`); disabled. Só um
   segmento selecionado por vez; a troca é instantânea, sem `motion.enter`.
@@ -148,9 +155,10 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
 - **EmptyState**: estante vazia, catálogo sem resultado, sem conquista ainda. Composição: texto
   de voz (seção 7) e CTA opcional. Não é um erro; não usa `color.danger`.
 - **Banner**: aviso no topo da tela (erro de rede preservando o que já carregou, aviso de
-  reflexão fraca). Duas variantes, não três: `error` (`color.dangerSoft`, texto `color.danger`) e
+  reflexão fraca). Duas variantes, não três: `danger` (`color.dangerSoft`, texto `color.danger`) e
   `info` (`color.surface1`, texto `color.text2`). Sem dispensar automaticamente: some quando a
-  causa é corrigida.
+  causa é corrigida — e é justamente por isso que **não existe banner de sucesso**: sucesso não
+  tem causa a corrigir, é transitório, e transitório é Toast.
 - **ListRow**: linha de lista com divisória (`color.line`), no lugar do card do sistema legado.
   Estados: default; pressed (`color.surface3`) quando a linha é tocável; disabled. Sem sombra,
   sem borda lateral de destaque (anti-pattern, seção 9).
@@ -252,8 +260,12 @@ Checklist de revisão. **(T)** marca o item coberto por teste automatizado na Ta
 - `fontSize` ou `fontFamily` literal fora de `tokens.ts` (T)
 - `Alert.alert` fora da lista de exceção (T)
 - Emoji em copy de interface (T)
-- Travessão, o caractere de em dash ou de en dash, em código: comentário ou string, copy
-  incluída (T)
+- Travessão, o caractere de em dash ou de en dash, **em texto que chega na tela**: string e copy
+  (T). **Comentário pode ter** — e essa exceção é deliberada, não frouxidão. A guarda filtra
+  comentário porque a razão de banir o travessão é que ele marca texto de máquina em copy de
+  produto, e comentário não é copy. Antes disso a guarda lia o arquivo cru, e o resultado foi
+  comentário sendo reescrito pior só para passar num grep (ADR 0010, corolário): quando uma
+  restrição empurra o remendo para o lugar errado, quem cede é a restrição.
 - `Pressable` sem `accessibilityRole` ou sem `accessibilityLabel` (T)
 - Lábio 3D (borda inferior grossa)
 - Borda lateral de destaque em card

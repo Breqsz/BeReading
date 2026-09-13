@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
-import { Text } from '../../src/ui/Text';
+import { Text, STATUS_TONE, type Status } from '../../src/ui/Text';
 import { type as typeTokens, color } from '../../src/theme/tokens';
 
 describe('Text', () => {
@@ -54,5 +54,17 @@ describe('Text', () => {
   it('repassa numberOfLines', () => {
     const { getByText } = render(<Text numberOfLines={2}>Titulo longo</Text>);
     expect(getByText('Titulo longo').props.numberOfLines).toBe(2);
+  });
+});
+
+describe('STATUS_TONE', () => {
+  // Banner e Toast leem este mapa em vez de decidir a cor do texto por conta
+  // propria: se o mapa mudar, os dois mudam juntos, sem divergir de novo.
+  it.each([
+    ['positive', 'positive'],
+    ['danger', 'danger'],
+    ['info', 'secondary'],
+  ])('mapeia o status %s para o tone %s', (status, tone) => {
+    expect(STATUS_TONE[status as Status]).toBe(tone);
   });
 });

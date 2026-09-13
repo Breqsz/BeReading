@@ -116,16 +116,16 @@ describe('Toast', () => {
     errorSpy.mockRestore();
   });
 
-  it('pinta o indicador com a cor do tom pedido, sucesso e erro nao podem parecer iguais', () => {
-    const { getByLabelText, getByTestId, rerender } = montar({ message: 'Ok', tone: 'success' });
+  it('pinta o indicador com a cor do tom pedido, positivo e perigo nao podem parecer iguais', () => {
+    const { getByLabelText, getByTestId, rerender } = montar({ message: 'Ok', tone: 'positive' });
     fireEvent.press(getByLabelText('disparar'));
-    const sucesso = StyleSheet.flatten(getByTestId('toast-indicator').props.style);
-    expect(sucesso.backgroundColor).toBe(color.positive);
+    const positivo = StyleSheet.flatten(getByTestId('toast-indicator').props.style);
+    expect(positivo.backgroundColor).toBe(color.positive);
 
-    rerender(<ToastProvider><Tela opts={{ message: 'Falhou', tone: 'error' }} /></ToastProvider>);
+    rerender(<ToastProvider><Tela opts={{ message: 'Falhou', tone: 'danger' }} /></ToastProvider>);
     fireEvent.press(getByLabelText('disparar'));
-    const erro = StyleSheet.flatten(getByTestId('toast-indicator').props.style);
-    expect(erro.backgroundColor).toBe(color.danger);
-    expect(erro.backgroundColor).not.toBe(sucesso.backgroundColor);
+    const perigo = StyleSheet.flatten(getByTestId('toast-indicator').props.style);
+    expect(perigo.backgroundColor).toBe(color.danger);
+    expect(perigo.backgroundColor).not.toBe(positivo.backgroundColor);
   });
 });

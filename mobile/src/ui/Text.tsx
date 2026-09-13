@@ -15,6 +15,24 @@ export const TONE_COLOR: Record<Tone, string> = {
   inverse: color.accentInk,
 };
 
+// Tone e Status sao dois tipos, de proposito, e nao um so. Tone e papel de
+// cor: qual tinta o texto usa. Status e estado do produto: deu certo, deu
+// errado, e so um aviso. Fundir os dois faria um valor sem sentido compilar
+// em qualquer lugar que aceite o outro (por exemplo, <Banner tone="inverse">,
+// que nao quer dizer nada). As palavras coincidem de proposito nos dois onde
+// o papel e o mesmo (positive, danger): usar o mesmo nome nos dois lados e o
+// que fecha a divergencia que a revisao da F2 apontou (danger num componente,
+// error noutro; positive e success).
+export type Status = 'positive' | 'danger' | 'info';
+
+// Traduz estado para o tone de texto que combina com ele. "info" pinta como
+// texto secundario porque aviso neutro nao tem tinta propria no sistema.
+export const STATUS_TONE: Record<Status, Tone> = {
+  positive: 'positive',
+  danger: 'danger',
+  info: 'secondary',
+};
+
 interface Props extends Omit<TextProps, 'style' | 'maxFontSizeMultiplier'> {
   variant?: TypeVariant;
   tone?: Tone;

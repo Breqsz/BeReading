@@ -2,14 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text } from './Text';
+import { Text, type Status } from './Text';
 import { TAB_BAR_HEIGHT } from './TabBar';
 import { color, elevation, motion, radius, space } from '../theme/tokens';
 
 export interface ToastOptions {
   message: string;
   detail?: string;
-  tone?: 'success' | 'error' | 'info';
+  tone?: Status;
   actionLabel?: string;
   onAction?: () => void;
 }
@@ -18,9 +18,9 @@ const DURATION_MS = 4000;
 
 // Ponto indicador a esquerda do texto: sem ele, toast de erro e de sucesso sao
 // visualmente identicos, e quem le rapido nao distingue os dois.
-const TONE_INDICATOR: Record<NonNullable<ToastOptions['tone']>, { dot: string; halo: string }> = {
-  success: { dot: color.positive, halo: color.positiveSoft },
-  error: { dot: color.danger, halo: color.dangerSoft },
+const TONE_INDICATOR: Record<Status, { dot: string; halo: string }> = {
+  positive: { dot: color.positive, halo: color.positiveSoft },
+  danger: { dot: color.danger, halo: color.dangerSoft },
   info: { dot: color.text2, halo: color.surface2 },
 };
 

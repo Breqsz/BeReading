@@ -5,7 +5,7 @@ import { Skeleton } from '../../src/ui/Skeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
 import { Banner } from '../../src/ui/Banner';
 import { ListRow } from '../../src/ui/ListRow';
-import { MIN_TOUCH } from '../../src/theme/tokens';
+import { MIN_TOUCH, color } from '../../src/theme/tokens';
 
 // O mock oficial de react-native-reanimated (usado globalmente no
 // jest.setup.ui.js) deixa useReducedMotion de fora de proposito — o proprio
@@ -86,7 +86,7 @@ describe('Banner', () => {
   it('mostra a mensagem e o botao de tentar de novo', () => {
     const onRetry = jest.fn();
     const { getByText, getByRole } = render(
-      <Banner tone="error" message="Caiu a internet. O que você registrou tá salvo." onRetry={onRetry} />,
+      <Banner tone="danger" message="Caiu a internet. O que você registrou tá salvo." onRetry={onRetry} />,
     );
     expect(getByText('Caiu a internet. O que você registrou tá salvo.')).toBeTruthy();
     fireEvent.press(getByRole('button'));
@@ -94,18 +94,29 @@ describe('Banner', () => {
   });
 
   it('se anuncia como alerta', () => {
-    const { getByRole } = render(<Banner tone="error" message="Falhou" />);
+    const { getByRole } = render(<Banner tone="danger" message="Falhou" />);
     expect(getByRole('alert')).toBeTruthy();
   });
 
   it('usa live region "polite", sem a qual o TalkBack nao anuncia o alert sozinho', () => {
-    const { getByRole } = render(<Banner tone="error" message="Falhou" />);
+    const { getByRole } = render(<Banner tone="danger" message="Falhou" />);
     expect(getByRole('alert').props.accessibilityLiveRegion).toBe('polite');
   });
 
   it('sem onRetry, nao renderiza botao', () => {
     const { queryByRole } = render(<Banner tone="info" message="Só um aviso" />);
     expect(queryByRole('button')).toBeNull();
+  });
+
+  it.each([
+    ['danger', color.dangerSoft, color.danger],
+    ['positive', color.positiveSoft, color.positive],
+    ['info', color.surface1, color.line],
+  ])('o tom %s pinta fundo e borda com o par certo', (tone, bg, border) => {
+    const { getByRole } = render(<Banner tone={tone as any} message="Aviso" />);
+    const estilo = StyleSheet.flatten(getByRole('alert').props.style);
+    expect(estilo.backgroundColor).toBe(bg);
+    expect(estilo.borderColor).toBe(border);
   });
 });
 

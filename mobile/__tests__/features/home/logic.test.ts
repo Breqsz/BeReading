@@ -1,0 +1,188 @@
+import {
+  currentChapterGoal,
+  daysSinceLastSession,
+  readSessionToday,
+  chooseAssistantReason,
+  formatXp,
+} from '../../../src/features/home/logic';
+import type { Chapter, ReadingSession } from '../../../src/types/database';
+
+const chapter = (over: Partial<Chapter>): Chapter => ({
+  id: `c-${over.number}`,
+  book_id: 'b1',
+  number: 1,
+  title: null,
+  start_page: 1,
+  end_page: 10,
+  ...over,
+});
+
+const sessao = (bookId: string, readAt: string): ReadingSession => ({
+  id: `s-${readAt}`,
+  user_id: 'u1',
+  book_id: bookId,
+  start_page: 1,
+  end_page: 2,
+  pages_read: 1,
+  read_at: readAt,
+});
+
+describe('currentChapterGoal', () => {
+  it('acha o capitulo corrente pela paginacao e calcula quanto falta', () => {
+    const chapters = [
+      chapter({ number: 1, end_page: 30 }),
+      chapter({ number: 2, end_page: 60 }),
+      chapter({ number: 3, end_page: 112 }),
+      chapter({ number: 4, end_page: 150 }),
+    ];
+    // Este teste passaria com a implementacao errada "primeiro capitulo da
+    // lista" se a pagina atual estivesse no capitulo 1 — por isso o valor
+    // testado (84) cai deliberadamente no MEIO da lista (capitulo 3).
+    expect(currentChapterGoal(chapters, 84)).toEqual({
+      chapterNumber: 3,
+      totalChapters: 4,
+      remainingPages: 112 - 84,
+    });
+  });
+
+  it('sem nenhum capitulo paginado, a meta some (nao inventa numero)', () => {
+    const chapters = [
+      chapter({ number: 1, end_page: null as unknown as number, start_page: null as unknown as number }),
+      chapter({ number: 2, end_page: null as unknown as number, start_page: null as unknown as number }),
+    ];
+    expect(currentChapterGoal(chapters, 84)).toBeNull();
+  });
+
+  it('pagina atual ja passou de todos os capitulos paginados: sem meta', () => {
+    const chapters = [chapter({ number: 1, end_page: 30 }), chapter({ number: 2, end_page: 60 })];
+    expect(currentChapterGoal(chapters, 200)).toBeNull();
+  });
+
+  it('sem capitulo nenhum, a meta some', () => {
+    expect(currentChapterGoal([], 10)).toBeNull();
+  });
+
+  it('capitulo sem paginacao no meio da lista nao quebra a busca pelo proximo paginado', () => {
+    const chapters = [
+      chapter({ number: 1, end_page: 30 }),
+      chapter({ number: 2, end_page: null as unknown as number }),
+      chapter({ number: 3, end_page: 90 }),
+    ];
+    expect(currentChapterGoal(chapters, 50)).toEqual({
+      chapterNumber: 3,
+      totalChapters: 3,
+      remainingPages: 40,
+    });
+  });
+});
+
+describe('daysSinceLastSession', () => {
+  it('conta dias corridos desde a sessao mais recente do livro', () => {
+    const sessions = [sessao('b1', '2026-09-10T12:00:00.000Z'), sessao('b1', '2026-09-08T12:00:00.000Z')];
+    const agora = new Date('2026-09-13T12:00:00.000Z');
+    expect(daysSinceLastSession(sessions, 'b1', agora)).toBe(3);
+  });
+
+  it('sem sessao nenhuma do livro, devolve null (nao inventa "parado ha 0 dias")', () => {
+    const sessions = [sessao('outro-livro', '2026-09-10T12:00:00.000Z')];
+    expect(daysSinceLastSession(sessions, 'b1', new Date('2026-09-13T12:00:00.000Z'))).toBeNull();
+  });
+
+  it('leu hoje mesmo: zero dias', () => {
+    const sessions = [sessao('b1', '2026-09-13T10:00:00.000Z')];
+    expect(daysSinceLastSession(sessions, 'b1', new Date('2026-09-13T20:00:00.000Z'))).toBe(0);
+  });
+});
+
+describe('readSessionToday', () => {
+  it('verdadeiro quando ha sessao no dia de hoje (fuso de Sao Paulo)', () => {
+    const sessions = [sessao('b1', '2026-09-13T10:00:00.000Z')];
+    expect(readSessionToday(sessions, new Date('2026-09-13T20:00:00.000Z'))).toBe(true);
+  });
+
+  it('falso sem sessao hoje', () => {
+    const sessions = [sessao('b1', '2026-09-12T10:00:00.000Z')];
+    expect(readSessionToday(sessions, new Date('2026-09-13T20:00:00.000Z'))).toBe(false);
+  });
+
+  it('falso sem sessao nenhuma', () => {
+    expect(readSessionToday([], new Date('2026-09-13T20:00:00.000Z'))).toBe(false);
+  });
+});
+
+describe('chooseAssistantReason', () => {
+  const agora = new Date('2026-09-13T22:00:00.000Z'); // 19h em Sao Paulo: depois das 18h
+
+  it('quiz pendente vence tudo', () => {
+    const r = chooseAssistantReason({
+      pendingQuiz: { chapterId: 'ch1', chapterNumber: 3, questionCount: 4 },
+      streak: 5,
+      readToday: false,
+      staleDays: 10,
+      now: agora,
+    });
+    expect(r).toEqual({ kind: 'quiz', chapterId: 'ch1', chapterNumber: 3, questionCount: 4 });
+  });
+
+  it('sem quiz, sequencia em risco aparece', () => {
+    const r = chooseAssistantReason({
+      pendingQuiz: null,
+      streak: 4,
+      readToday: false,
+      staleDays: null,
+      now: agora,
+    });
+    expect(r).toEqual({ kind: 'streakRisk', hoursLeft: 5 });
+  });
+
+  it('sem quiz e sem risco, livro parado ha 3 dias ou mais aparece', () => {
+    const r = chooseAssistantReason({
+      pendingQuiz: null,
+      streak: 4,
+      readToday: true, // ja leu hoje: sem risco de sequencia
+      staleDays: 3,
+      now: agora,
+    });
+    expect(r).toEqual({ kind: 'stale', days: 3 });
+  });
+
+  it('livro parado ha menos de 3 dias nao acorda o assistente', () => {
+    const r = chooseAssistantReason({
+      pendingQuiz: null,
+      streak: 4,
+      readToday: true,
+      staleDays: 2,
+      now: agora,
+    });
+    expect(r).toBeNull();
+  });
+
+  it('nada a dizer: sem card', () => {
+    const r = chooseAssistantReason({
+      pendingQuiz: null,
+      streak: 0,
+      readToday: true,
+      staleDays: null,
+      now: new Date('2026-09-13T14:00:00.000Z'), // manha em SP
+    });
+    expect(r).toBeNull();
+  });
+});
+
+describe('formatXp', () => {
+  it('agrupa milhar com ponto, no padrao pt-BR', () => {
+    expect(formatXp(1840)).toBe('1.840');
+  });
+
+  it('nao agrupa numero pequeno', () => {
+    expect(formatXp(50)).toBe('50');
+  });
+
+  it('agrupa milhoes com dois pontos', () => {
+    expect(formatXp(1234567)).toBe('1.234.567');
+  });
+
+  it('zero permanece zero', () => {
+    expect(formatXp(0)).toBe('0');
+  });
+});

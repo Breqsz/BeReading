@@ -1,7 +1,7 @@
 import * as lines from '../../src/assistant/lines';
 import {
   greeting, streakLine, streakRiskLine, chapterClosedTitle,
-  levelUpLine, scoreLine, quizStateLine, pendingQuizLine,
+  levelUpLine, scoreLine, quizStateLine, pendingQuizLine, staleBookLine,
 } from '../../src/assistant/lines';
 import { ASSISTANT_NAME } from '../../src/assistant/persona';
 
@@ -17,6 +17,7 @@ const TODAS = [
   levelUpLine(5, 'Maratonista'),
   scoreLine(92), scoreLine(60), scoreLine(10), scoreLine(null),
   pendingQuizLine(3, 4), pendingQuizLine(3, 1),
+  staleBookLine(3), staleBookLine(1),
   quizStateLine('polling', 5).text,
   quizStateLine('still-generating', 5).text,
   quizStateLine('no-content', 5).text,
@@ -28,7 +29,7 @@ const TODAS = [
 it('TODAS cobre toda fala exportada por lines.ts', () => {
   expect(Object.keys(lines).sort()).toEqual([
     'chapterClosedTitle', 'greeting', 'levelUpLine', 'pendingQuizLine',
-    'quizStateLine', 'scoreLine', 'streakLine', 'streakRiskLine',
+    'quizStateLine', 'scoreLine', 'staleBookLine', 'streakLine', 'streakRiskLine',
   ].sort());
 });
 
@@ -143,6 +144,16 @@ describe('pendingQuizLine', () => {
 
   it('trata o singular', () => {
     expect(pendingQuizLine(3, 1)).toBe('Você fechou o capítulo 3 e deixou 1 pergunta pra trás.');
+  });
+});
+
+describe('staleBookLine', () => {
+  it('lembra do livro parado, com plural', () => {
+    expect(staleBookLine(3)).toBe('Faz 3 dias que você não abre o livro. Uma página já reata.');
+  });
+
+  it('trata o singular', () => {
+    expect(staleBookLine(1)).toBe('Faz 1 dia que você não abre o livro. Uma página já reata.');
   });
 });
 

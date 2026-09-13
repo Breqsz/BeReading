@@ -6,18 +6,13 @@ const RAIZ = join(__dirname, '..', '..');
 /**
  * Pastas .tsx que ja tem arquivo real hoje (accessibilityRole/Label so faz
  * sentido em JSX). app/ entra nesta rodada (F4, Tarefa 1): e onde a fase
- * escreve tela nova, e o app antigo tinha zero accessibilityLabel. Ver
- * designTokens.test.ts pro raciocinio completo de por que src/features fica
- * fora desta lista especifica (so em VIGIADAS, abaixo).
+ * escreve tela nova, e o app antigo tinha zero accessibilityLabel.
+ * `src/features` entrou na F4 Tarefa 4, com `src/features/home/`: e' a
+ * primeira pasta de blocos de tela com JSX de verdade, Pressable incluido.
  */
-const VIGIADAS_COM_CONTEUDO = ['src/ui', 'app'];
+const VIGIADAS_COM_CONTEUDO = ['src/ui', 'app', 'src/features'];
 
-/**
- * src/features ainda nao existe (nasce na Tarefa 2). Entra em VIGIADAS
- * vazia mesmo assim, pelo mesmo motivo das outras duas guardas: nasce
- * coberta desde o primeiro arquivo .tsx, sem depender de lembranca futura.
- */
-const VIGIADAS = [...VIGIADAS_COM_CONTEUDO, 'src/features'];
+const VIGIADAS = VIGIADAS_COM_CONTEUDO;
 
 /**
  * As pastas que o redesign (F2-F4) entregou, mesmo as que esta guarda em
@@ -78,13 +73,6 @@ describe('guarda: acessibilidade', () => {
   // correcao 1) pro raciocinio completo de por que o total sozinho nao basta.
   it.each(VIGIADAS_COM_CONTEUDO)('a pasta %s tem arquivo para varrer', (dir) => {
     expect(arquivos(dir).length).toBeGreaterThan(0);
-  });
-
-  // src/features fica de fora do it.each acima de proposito: ver
-  // designTokens.test.ts. Afirma o vazio atual em vez de so pular a
-  // checagem, e vira tripwire quando a Tarefa 2 criar o primeiro arquivo.
-  it('src/features ainda esta vazia nesta tarefa (Tarefa 2 cria o primeiro arquivo)', () => {
-    expect(arquivos('src/features').length).toBe(0);
   });
 
   it.each(TODOS)('%s: se tem Pressable, declara role e label', (rel) => {

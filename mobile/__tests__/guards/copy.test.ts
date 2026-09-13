@@ -5,23 +5,19 @@ const RAIZ = join(__dirname, '..', '..');
 
 /**
  * Pastas onde o sistema novo ja vale, e que hoje tem pelo menos um arquivo
- * real. Ver designTokens.test.ts pro raciocinio completo de por que
- * src/features fica fora desta lista especifica e entra so em VIGIADAS.
+ * real.
  *
  * src/game entrou nesta rodada: LEVEL_TITLES em src/game/xp.ts ("Rato de
  * biblioteca" etc.) e copy de verdade, exibida na tela, e nao tinha guarda
  * nenhuma de emoji/travessao ate agora — a checagem inversa no fim do
- * arquivo foi o que acusou o buraco.
+ * arquivo foi o que acusou o buraco. `src/features` entrou na F4 Tarefa 4,
+ * quando `src/features/home/` nasceu o primeiro bloco de tela real (ver
+ * designTokens.test.ts pro raciocinio completo de por que ela ficava fora
+ * antes disso).
  */
-const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app'];
+const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app', 'src/features'];
 
-/**
- * F4 (Tarefa 1): `app/` e `src/features` sao onde as tarefas seguintes desta
- * fase escrevem tela nova. src/features ainda nao existe (nasce na Tarefa 2)
- * e entra aqui mesmo vazia, pelo mesmo motivo de designTokens.test.ts: nasce
- * coberta desde o primeiro arquivo, sem depender de lembranca futura.
- */
-const VIGIADAS = [...VIGIADAS_COM_CONTEUDO, 'src/features'];
+const VIGIADAS = VIGIADAS_COM_CONTEUDO;
 
 /** Pastas do sistema "Luminous Library" anterior, que ainda nao migraram
  * (saem na F6). Lista compartilhada pelas tres guardas deste diretorio. */
@@ -43,14 +39,12 @@ const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types
  */
 const EXCECAO_EMOJI = new Set([
   'app/(tabs)/catalogo.tsx',
-  'app/(tabs)/index.tsx',
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
 ]);
 
 const EXCECAO_TRAVESSAO = new Set([
   'app/(auth)/login.tsx',
-  'app/(tabs)/index.tsx',
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
@@ -99,13 +93,6 @@ describe('guarda: copy', () => {
   // correcao 1) pro raciocinio completo de por que o total sozinho nao basta.
   it.each(VIGIADAS_COM_CONTEUDO)('a pasta %s tem arquivo para varrer', (dir) => {
     expect(arquivos(dir).length).toBeGreaterThan(0);
-  });
-
-  // src/features fica de fora do it.each acima de proposito: ver
-  // designTokens.test.ts. Este teste afirma o vazio atual em vez de so pular
-  // a checagem, e vira tripwire quando a Tarefa 2 criar o primeiro arquivo.
-  it('src/features ainda esta vazia nesta tarefa (Tarefa 2 cria o primeiro arquivo)', () => {
-    expect(arquivos('src/features').length).toBe(0);
   });
 
   it.each(TODOS)('%s nao tem emoji', (rel) => {

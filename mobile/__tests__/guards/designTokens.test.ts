@@ -9,30 +9,18 @@ const RAIZ = join(__dirname, '..', '..');
 
 /**
  * Pastas onde o sistema novo ja vale, e que hoje tem pelo menos um arquivo
- * real (por isso ficam fora da checagem especial de pasta vazia, logo
- * abaixo). src/components e app/(tabs) entram conforme migram.
- */
-const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app'];
-
-/**
- * F4 (Tarefa 1): fecha o buraco que a revisao da F2 apontou. `app/` e
- * `src/features` sao exatamente onde as tarefas seguintes desta fase vao
- * escrever tela nova — sem entrar em VIGIADAS agora, tela nova nasceria
- * descoberta (cor literal, fontSize solto, Alert.alert) sem nenhum teste
- * acusar.
+ * real. src/components e app/(tabs) entram conforme migram.
  *
- * `src/features` ainda nao existe (nasce na Tarefa 2, quando o primeiro
- * bloco de tela for criado). Ela entra aqui mesmo assim, vazia: a varredura
- * (`arquivos`, abaixo) tolera pasta ausente ou vazia e so vai encontrar
- * arquivo pra valer quando a Tarefa 2 criar o primeiro — nascendo coberta
- * desde o primeiro arquivo, sem depender de alguem lembrar de atualizar esta
- * guarda depois. A checagem "pasta tem arquivo pra varrer" (que existe pra
- * acusar pasta renomeada ou movida) nao faz sentido pra uma pasta que E pra
- * estar vazia agora: por isso ela roda so em VIGIADAS_COM_CONTEUDO, e
- * src/features ganha teste proprio mais abaixo, que afirma o estado atual em
- * vez de so pular a checagem (ver esse teste pra o raciocinio completo).
+ * `src/features` entrou nesta lista na F4 Tarefa 4: antes disso a pasta
+ * existia vazia (Tarefa 1 a colocou em VIGIADAS so' para nascer coberta
+ * quando ganhasse o primeiro arquivo, sem exigir "tem arquivo para varrer"
+ * enquanto ainda nao tinha nenhum). `src/features/home/` foi o primeiro
+ * bloco de tela a nascer ali; a partir de agora ela responde pela guarda
+ * como qualquer pasta do redesign.
  */
-const VIGIADAS = [...VIGIADAS_COM_CONTEUDO, 'src/features'];
+const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app', 'src/features'];
+
+const VIGIADAS = VIGIADAS_COM_CONTEUDO;
 
 /**
  * Pastas do sistema "Luminous Library" anterior, que ainda nao migraram (saem
@@ -81,7 +69,6 @@ const EXCECOES_COR = new Set([
 const EXCECAO_COR = new Set([
   'app/(auth)/confirm-email.tsx',
   'app/(tabs)/catalogo.tsx',
-  'app/(tabs)/index.tsx',
   'app/(tabs)/livros.tsx',
   'app/(tabs)/perfil.tsx',
   'app/book/[id].tsx',
@@ -153,15 +140,6 @@ describe('guarda: cor', () => {
   // passaria protegendo nada. Isso acusa pasta renomeada ou movida.
   it.each(VIGIADAS_COM_CONTEUDO)('a pasta %s tem arquivo para varrer', (dir) => {
     expect(arquivos(dir).length).toBeGreaterThan(0);
-  });
-
-  // src/features nao entra no it.each acima porque HOJE ela deve estar vazia
-  // (ver comentario de VIGIADAS). Esta afirma o estado atual em vez de so
-  // pular a checagem: no dia que a Tarefa 2 criar o primeiro arquivo, este
-  // teste comeca a falhar sozinho e obriga quem migrar a trocar para
-  // toBeGreaterThan(0) — nao a apagar a linha silenciosamente.
-  it('src/features ainda esta vazia nesta tarefa (Tarefa 2 cria o primeiro arquivo)', () => {
-    expect(arquivos('src/features').length).toBe(0);
   });
 
   it.each(TODOS)('%s nao tem cor literal fora dos tokens', (rel) => {

@@ -79,3 +79,14 @@ export function pendingQuizLine(chapterNumber: number, count: number): string {
   const perguntas = count === 1 ? '1 pergunta' : `${count} perguntas`;
   return `Você fechou o capítulo ${chapterNumber} e deixou ${perguntas} pra trás.`;
 }
+
+/**
+ * O livro em leitura ficou `days` dias sem sessão nova. Terceiro gatilho do
+ * card da Orelha na Hoje (quiz pendente e sequência em risco vêm antes na
+ * prioridade), sem entrada própria na tabela de voz do DESIGN.md ainda —
+ * segue o mesmo padrão de "uma página já X" de `streakLine`/`streakRiskLine`.
+ */
+export function staleBookLine(days: number): string {
+  const tempo = days === 1 ? '1 dia' : `${days} dias`;
+  return `Faz ${tempo} que você não abre o livro. Uma página já reata.`;
+}

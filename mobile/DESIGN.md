@@ -208,6 +208,7 @@ criança, travessão em copy.
 | saudação | "E aí, {nome}" |
 | sequência | "{n} dias seguidos. Lê hoje e vira {n+1}." |
 | sequência em risco | "Faltam {h}h pra sua sequência zerar. Uma página já conta." |
+| livro parado (F4) | "Faz {n} dias que você não abre o livro. Uma página já reata." |
 | capítulo fechado | "Capítulo {n}, fechado." / "Bora ver o que ficou?" |
 | nota alta / baixa | "Mandou bem." / "Quase. Olha esse detalhe que passou." |
 | subiu de nível | "Nível {n}. Agora você é {título}." |

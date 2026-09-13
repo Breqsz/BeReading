@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Compass, Wand } from 'lucide-react-native';
+import { BookOpen, Compass, Wand } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { ProfileErrorState } from '../../src/components/ProfileErrorState';
 import { useReadingStore } from '../../src/stores/readingStore';
@@ -237,7 +237,24 @@ export default function HomeScreen() {
                 </View>
               </View>
             </Card>
-          ) : (
+          ) : null}
+
+          {/* DIVIDA DECLARADA, morre na F4 Tarefa 4 (BER-77).
+              A F3 trocou o CustomTabBar pelo TabBar novo, e o CustomTabBar era o
+              unico lugar do app inteiro com um caminho para /register-reading (o
+              FAB, testID "fab-registrar"). Tirar o FAB da barra esta certo e e a
+              decisao D5 da spec, mas o destino contextual so nasce na Tarefa 4 —
+              e entre uma coisa e outra a acao central do produto ficou
+              inalcancavel. Este botao existe so pra fechar esse buraco ate a
+              Hoje nova assumir; a guarda de alcance em __tests__/guards/rotas
+              impede que ele suma sem substituto. */}
+          {currentEntry && (
+            <Press3DButton onPress={() => router.push('/register-reading')} Icon={BookOpen}>
+              Registrar leitura
+            </Press3DButton>
+          )}
+
+          {!currentEntry && (
             <Card style={{ padding: 28, alignItems: 'center', gap: 8 }}>
               <Text style={{ fontSize: 36 }}>📚</Text>
               <Text style={{

@@ -78,6 +78,91 @@ const NAVEGACOES = ARQUIVOS.flatMap((arquivo) =>
   alvosDe(readFileSync(join(RAIZ, arquivo), 'utf8')).map((alvo) => ({ arquivo, alvo }))
 );
 
+/**
+ * Prefixo estatico de rota montada com template: `/book/${id}` da `/book/`.
+ * Rota dinamica quase nunca e navegada por string literal, entao sem isto ela
+ * pareceria inalcancavel pela checagem abaixo.
+ */
+function prefixosDe(bruto: string): string[] {
+  const codigo = semComentario(bruto);
+  const achados = [...codigo.matchAll(/`(\/[^`$]*)\$\{/g)].map((m) => m[1]);
+  return [...new Set(achados)];
+}
+
+const PREFIXOS = new Set(ARQUIVOS.flatMap((a) => prefixosDe(readFileSync(join(RAIZ, a), 'utf8'))));
+const ALVOS = new Set(NAVEGACOES.map((n) => n.alvo));
+
+/** As quatro abas: o TabBar navega por `route.name`, nao por caminho. */
+const ABAS = /^app\/\(tabs\)\//;
+
+/**
+ * Rota que existe, esta registrada, e que **ninguem alcanca**. Cada entrada e
+ * divida com prazo, nao permissao permanente, e o teste logo abaixo obriga a
+ * lista a encolher sozinha.
+ */
+const SEM_CHAMADOR: Record<string, string> = {
+  'app/chapter-complete.tsx':
+    'Placeholder criado pela F3 Tarefa 4. Quem vai chamar e o sheet novo de ' +
+    'registrar leitura, na F4 Tarefa 5. Sai desta lista naquela tarefa.',
+};
+
+function alcancavel(arquivo: string): boolean {
+  if (ABAS.test(arquivo)) return true;
+  const urls = urlsDe(arquivo);
+  if (urls.some((u) => ALVOS.has(u))) return true;
+  return urls.some((u) => [...PREFIXOS].some((p) => u.startsWith(p)));
+}
+
+/**
+ * O espelho da checagem de cima, e a que faltava.
+ *
+ * A primeira pergunta "quem navega pra ca chega em tela de verdade?". Esta
+ * pergunta o contrario: "esta tela, alguem alcanca?". As duas nasceram de
+ * defeitos reais da F3, do mesmo tamanho e em sentidos opostos:
+ *
+ * - `reading-success` continuou sendo alvo de navegacao, mas virou um redirect
+ *   mudo. Destino sem conteudo.
+ * - `register-reading` continuou intacta, mas a F3 trocou o CustomTabBar (que
+ *   tinha o FAB, o unico caminho do app inteiro pra ela) pelo TabBar novo, que
+ *   nao tem. Conteudo sem destino: a acao central do produto ficou inalcancavel
+ *   e a suite inteira seguiu verde. Pior, o teste do TabBar novo AFIRMA que o
+ *   FAB sumiu (`queryByTestId('fab-registrar')` nulo) sem nada checar se a
+ *   funcao dele foi pra algum lugar.
+ */
+describe('guarda: toda tela registrada tem quem a alcance', () => {
+  const TELAS = ARQUIVOS.filter((a) => !/_layout\.tsx$/.test(a));
+
+  it.each(TELAS)('%s e alcancavel, ou esta declarada sem chamador', (arquivo) => {
+    if (SEM_CHAMADOR[arquivo]) return;
+    expect({ arquivo, alcancavel: alcancavel(arquivo) }).toEqual({ arquivo, alcancavel: true });
+  });
+
+  // Tripwire inverso, mesma regra das outras guardas: exceção que deixou de ser
+  // necessaria e' cobertura perdida em silencio.
+  it.each(Object.keys(SEM_CHAMADOR))('%s continua mesmo sem chamador', (arquivo) => {
+    expect({
+      arquivo,
+      recado: alcancavel(arquivo)
+        ? 'Ja tem quem navegue pra ca: tire esta linha de SEM_CHAMADOR em rotas.test.ts'
+        : 'ainda sem chamador',
+    }).toEqual({ arquivo, recado: 'ainda sem chamador' });
+  });
+
+  it('a leitura de prefixo pega rota montada com template', () => {
+    expect(prefixosDe('router.push(`/book/${id}`)')).toEqual(['/book/']);
+    expect(prefixosDe("// router.push(`/nada/${x}`)")).toEqual([]);
+  });
+
+  it('reconhece o defeito real: sem o botao da Hoje, register-reading fica orfa', () => {
+    // Simula o estado em que a branch esteve: nenhum arquivo navegando pra la.
+    const alvosSemBotao = new Set([...ALVOS].filter((u) => u !== '/register-reading'));
+    const orfa = !alvosSemBotao.has('/register-reading');
+    expect(orfa).toBe(true);
+    // E hoje, com o botao de volta, ela e alcancavel de novo.
+    expect(alcancavel('app/register-reading.tsx')).toBe(true);
+  });
+});
+
 /** Componente cujo corpo inteiro e um `<Redirect ...>`, sem ramo nenhum. */
 function soRedireciona(bruto: string): boolean {
   const codigo = semComentario(bruto);

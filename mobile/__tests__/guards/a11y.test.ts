@@ -47,7 +47,6 @@ const EXCECAO_A11Y = new Set([
   'app/(tabs)/perfil.tsx',
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
-  'app/register-reading.tsx',
 ]);
 
 function arquivos(dir: string): string[] {

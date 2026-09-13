@@ -101,9 +101,9 @@ const ABAS = /^app\/\(tabs\)\//;
  * lista a encolher sozinha.
  */
 const SEM_CHAMADOR: Record<string, string> = {
-  'app/chapter-complete.tsx':
-    'Placeholder criado pela F3 Tarefa 4. Quem vai chamar e o sheet novo de ' +
-    'registrar leitura, na F4 Tarefa 5. Sai desta lista naquela tarefa.',
+  // Vazia desde a F4 Tarefa 5. A unica entrada era app/chapter-complete.tsx
+  // (placeholder da F3), e o sheet de registrar leitura passou a navegar pra
+  // ela quando o servidor devolve capitulo fechado.
 };
 
 function alcancavel(arquivo: string): boolean {
@@ -139,13 +139,15 @@ describe('guarda: toda tela registrada tem quem a alcance', () => {
 
   // Tripwire inverso, mesma regra das outras guardas: exceção que deixou de ser
   // necessaria e' cobertura perdida em silencio.
-  it.each(Object.keys(SEM_CHAMADOR))('%s continua mesmo sem chamador', (arquivo) => {
-    expect({
-      arquivo,
-      recado: alcancavel(arquivo)
-        ? 'Ja tem quem navegue pra ca: tire esta linha de SEM_CHAMADOR em rotas.test.ts'
-        : 'ainda sem chamador',
-    }).toEqual({ arquivo, recado: 'ainda sem chamador' });
+  //
+  // Um `it` so, e nao `it.each`: com a lista vazia (o estado bom, desde a F4
+  // Tarefa 5), `it.each([])` quebra o Jest em vez de passar. Enquanto a lista
+  // estiver vazia este teste nao checa nada; ele fica para a proxima entrada
+  // que alguem acrescentar.
+  it('nenhuma entrada de SEM_CHAMADOR ja tem quem navegue pra ca', () => {
+    const jaAlcancaveis = Object.keys(SEM_CHAMADOR).filter((arquivo) => alcancavel(arquivo));
+    // Se reprovar: tire estas linhas de SEM_CHAMADOR em rotas.test.ts.
+    expect(jaAlcancaveis).toEqual([]);
   });
 
   it('a leitura de prefixo pega rota montada com template', () => {
@@ -203,7 +205,7 @@ describe('guarda: a leitura de rota funciona', () => {
   it('resolve grupo, index e raiz', () => {
     expect(urlsDe('app/(tabs)/index.tsx')).toEqual(['/(tabs)', '/']);
     expect(urlsDe('app/(tabs)/catalogo.tsx')).toEqual(['/(tabs)/catalogo', '/catalogo']);
-    expect(urlsDe('app/reading-success.tsx')).toEqual(['/reading-success']);
+    expect(urlsDe('app/chapter-complete.tsx')).toEqual(['/chapter-complete']);
   });
 
   it('reconhece o redirect mudo que causou o defeito da F3', () => {
@@ -240,7 +242,7 @@ describe('guarda: a leitura de rota funciona', () => {
   it('nao le alvo de navegacao dentro de comentario', () => {
     const comentado = `
       // o sheet vai chamar router.replace('/chapter-complete') na F4
-      /* e o antigo era pathname: '/reading-success' */
+      /* e o antigo era pathname: '/rota-antiga' */
       export default function Tela() {
         return <Pressable onPress={() => router.push('/quiz/summary')} />;
       }

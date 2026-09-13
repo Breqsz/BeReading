@@ -33,9 +33,8 @@ const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types
  * cruzada pra decidir manter em modulo compartilhado (ver nota antes do
  * describe de tripwire, mais abaixo).
  *
- * chapter-complete.tsx, reading-success.tsx (fora desta, ver linha da
- * excecao) e os tres _layout.tsx nao entram: nao violam nem emoji nem
- * travessao.
+ * chapter-complete.tsx, register-reading.tsx (reescrito na F4 Tarefa 5) e os
+ * tres _layout.tsx nao entram: nao violam nem emoji nem travessao.
  */
 const EXCECAO_EMOJI = new Set([
   'app/(tabs)/catalogo.tsx',
@@ -48,7 +47,6 @@ const EXCECAO_TRAVESSAO = new Set([
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
-  'app/register-reading.tsx',
 ]);
 
 /**

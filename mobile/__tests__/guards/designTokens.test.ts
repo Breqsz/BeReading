@@ -60,9 +60,10 @@ const EXCECOES_COR = new Set([
  * reescrita e a violacao desaparecer (nunca antes, e o tripwire logo abaixo
  * do describe de cada guarda barra a saida cedo demais).
  *
- * app/chapter-complete.tsx e app/reading-success.tsx (F3) NAO entram em
- * nenhuma: sao novos e limpos, e por isso respondem pela guarda como
- * qualquer arquivo de VIGIADAS. app/_layout.tsx, app/(auth)/_layout.tsx e
+ * app/chapter-complete.tsx (F3) NAO entra em nenhuma: e novo e limpo, e por
+ * isso responde pela guarda como qualquer arquivo de VIGIADAS. O mesmo vale
+ * para app/register-reading.tsx desde a F4 Tarefa 5, que o reescreveu no
+ * sistema novo. app/_layout.tsx, app/(auth)/_layout.tsx e
  * app/(tabs)/_layout.tsx (tambem tocados na F3) tambem ficam de fora: nenhum
  * tinha cor, fontSize ou Alert.alert literal de verdade.
  */
@@ -74,11 +75,6 @@ const EXCECAO_COR = new Set([
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
-  // Volta da F3: o redirect que substituiu esta tela apagou a confirmacao do
-  // caminho mais comum do app. Sai da lista quando a F4 Tarefa 5 apagar o
-  // arquivo.
-  'app/reading-success.tsx',
-  'app/register-reading.tsx',
 ]);
 
 /**
@@ -94,7 +90,6 @@ const EXCECAO_FEEDBACK = new Set([
   'app/(auth)/signup.tsx',
   'app/(tabs)/catalogo.tsx',
   'app/quiz/[chapterId].tsx',
-  'app/register-reading.tsx',
 ]);
 
 function arquivos(dir: string): string[] {

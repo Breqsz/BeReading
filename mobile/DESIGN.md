@@ -171,7 +171,10 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
   qualquer tela pode compor conteúdo dentro dele.
 - **Toast**: confirmação transitória (registro salvo, conquista simples), via `ToastProvider`, no
   lugar de `Alert.alert`. Estados: entering (`motion.enter`); visible; exiting (`motion.exit`, ⅔
-  da entrada). Não bloqueia interação por trás.
+  da entrada). Não bloqueia interação por trás. No iOS a camada do toast monta dentro de
+  `FullWindowOverlay` (react-native-screens), uma vez por toast: desenhado só na raiz do app, ele
+  ficava atrás de sheet e modal nativos, que o iOS apresenta acima dela, e o erro com "Tentar" do
+  sheet de registro não aparecia (F4-11).
 - **Screen**: casca de toda tela. Pinta `color.bg`, aplica o inset superior real do aparelho e
   reserva embaixo o espaço de `TAB_BAR_HEIGHT` mais o inset inferior, para que nenhum conteúdo
   role atrás da barra. Variação por `scroll` (rolável ou fixa) e por `tabBar` (telas fora das abas

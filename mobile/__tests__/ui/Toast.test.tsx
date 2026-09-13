@@ -1,7 +1,25 @@
-import { render, fireEvent, act } from '@testing-library/react-native';
-import { Pressable, StyleSheet, Text as RNText } from 'react-native';
+import { render, fireEvent, act, within } from '@testing-library/react-native';
+import { Platform, Pressable, StyleSheet, Text as RNText } from 'react-native';
 import { ToastProvider, useToast } from '../../src/ui/Toast';
-import { color } from '../../src/theme/tokens';
+import { color, motion } from '../../src/theme/tokens';
+
+// F4-11: no iOS o toast passa pelo FullWindowOverlay do react-native-screens.
+// O mock troca o componente nativo por uma View que conta quantas vezes montou
+// e repassa as props, para o teste enxergar por onde o toast passa. Fica aqui,
+// na camada de teste: o Toast.tsx nao tem ramo nenhum que exista so para o
+// Jest (ADR 0010, corolario).
+const mockOverlay = { montagens: 0 };
+jest.mock('react-native-screens', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  function FullWindowOverlay({ children, ...props }: { children?: React.ReactNode; [prop: string]: unknown }) {
+    React.useEffect(() => {
+      mockOverlay.montagens += 1;
+    }, []);
+    return React.createElement(View, { testID: 'full-window-overlay', ...props }, children);
+  }
+  return { FullWindowOverlay };
+});
 
 function Tela({ opts }: { opts: any }) {
   const { show } = useToast();
@@ -127,5 +145,91 @@ describe('Toast', () => {
     const perigo = StyleSheet.flatten(getByTestId('toast-indicator').props.style);
     expect(perigo.backgroundColor).toBe(color.danger);
     expect(perigo.backgroundColor).not.toBe(positivo.backgroundColor);
+  });
+});
+
+// F4-11: o ToastProvider vive na raiz, e no iOS sheet e modal nativos sao
+// apresentados acima dela. Sem o overlay, o toast de erro do sheet de registro
+// (com o "Tentar") ficava atras do proprio sheet.
+describe('Toast por cima de sheet e modal nativos (F4-11)', () => {
+  const erro = { message: 'Não deu pra registrar sua leitura.', tone: 'danger', actionLabel: 'Tentar' };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockOverlay.montagens = 0;
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('no iOS o toast, e o "Tentar" dele, passam pelo FullWindowOverlay', () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    const onAction = jest.fn();
+    const { getByLabelText, getByTestId } = montar({ ...erro, onAction });
+    fireEvent.press(getByLabelText('disparar'));
+
+    const overlay = getByTestId('full-window-overlay');
+    expect(within(overlay).getByText('Não deu pra registrar sua leitura.')).toBeTruthy();
+    fireEvent.press(within(overlay).getByRole('button', { name: 'Tentar' }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('no iOS o overlay nao prende o VoiceOver: o toast nao e modal', () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    const { getByLabelText, getByTestId } = montar(erro);
+    fireEvent.press(getByLabelText('disparar'));
+    expect(getByTestId('full-window-overlay').props.unstable_accessibilityContainerViewIsModal).toBe(false);
+  });
+
+  it('sem toast na tela, nao ha overlay na janela', () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    const { queryByTestId } = montar(erro);
+    expect(queryByTestId('full-window-overlay')).toBeNull();
+    expect(mockOverlay.montagens).toBe(0);
+  });
+
+  // O container nativo entra na janela quando o overlay monta. Montado antes de
+  // um sheet abrir, ficaria atras dele: por isso cada toast monta o seu.
+  it('no iOS cada toast novo monta o overlay de novo', () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    const { getByLabelText, getAllByTestId, rerender } = montar({ message: 'Primeiro' });
+    fireEvent.press(getByLabelText('disparar'));
+    expect(mockOverlay.montagens).toBe(1);
+
+    rerender(<ToastProvider><Tela opts={erro} /></ToastProvider>);
+    fireEvent.press(getByLabelText('disparar'));
+    expect(mockOverlay.montagens).toBe(2);
+    expect(getAllByTestId('full-window-overlay')).toHaveLength(1);
+  });
+
+  it('no iOS o overlay espera a saida do toast terminar e so entao desmonta', () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    const { getByLabelText, queryByText, queryByTestId } = montar(erro);
+    fireEvent.press(getByLabelText('disparar'));
+
+    act(() => { jest.advanceTimersByTime(4000); });
+    expect(queryByText('Não deu pra registrar sua leitura.')).toBeNull();
+    expect(queryByTestId('full-window-overlay')).not.toBeNull();
+
+    // Um ms antes do fim da saida a camada ainda esta la. Sem este passo o teste
+    // nao distinguia "espera motion.exit" de "nao espera nada": timer de 0 ms
+    // criado durante o avanco do relogio falso vira 1 ms e so dispara no avanco
+    // seguinte (@sinonjs/fake-timers), e a sabotagem com 0 ms passava verde.
+    act(() => { jest.advanceTimersByTime(motion.exit.duration - 1); });
+    expect(queryByTestId('full-window-overlay')).not.toBeNull();
+
+    act(() => { jest.advanceTimersByTime(1); });
+    expect(queryByTestId('full-window-overlay')).toBeNull();
+  });
+
+  it('fora do iOS nao usa o overlay, que la nao existe', () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const { getByLabelText, getByText, queryByTestId } = montar(erro);
+    fireEvent.press(getByLabelText('disparar'));
+
+    expect(getByText('Não deu pra registrar sua leitura.')).toBeTruthy();
+    expect(queryByTestId('full-window-overlay')).toBeNull();
+    expect(mockOverlay.montagens).toBe(0);
   });
 });

@@ -30,6 +30,21 @@ export function chapterClosedTitle(chapterNumbers: number[]): string {
   return `${chapterNumbers.length} capítulos, fechados.`;
 }
 
+/**
+ * O titulo quando nao da pra saber o numero do capitulo (F4-15: a consulta dos
+ * capitulos falhou). Nao inventa numero; a contagem vem dos ids que o proprio
+ * registro devolveu.
+ */
+export function chapterClosedTitleWithoutNumber(count: number): string {
+  if (count <= 1) return 'Capítulo fechado.';
+  return `${count} capítulos, fechados.`;
+}
+
+/** O convite pro quiz logo abaixo do titulo de capitulo fechado (spec 7.3, F4-16). */
+export function quizInviteLine(): string {
+  return 'Bora ver o que ficou?';
+}
+
 export function levelUpLine(level: number, title: string): string {
   return `Nível ${level}. Agora você é ${title}.`;
 }

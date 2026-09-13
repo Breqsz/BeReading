@@ -2,6 +2,7 @@ import * as lines from '../../src/assistant/lines';
 import {
   greeting, streakLine, streakRiskLine, chapterClosedTitle,
   levelUpLine, scoreLine, quizStateLine, pendingQuizLine, staleBookLine,
+  chapterClosedTitleWithoutNumber, quizInviteLine,
 } from '../../src/assistant/lines';
 import { ASSISTANT_NAME } from '../../src/assistant/persona';
 
@@ -14,6 +15,8 @@ const TODAS = [
   streakLine(4), streakLine(0), streakLine(1),
   streakRiskLine(3),
   chapterClosedTitle([4]), chapterClosedTitle([4, 5]),
+  chapterClosedTitleWithoutNumber(1), chapterClosedTitleWithoutNumber(3),
+  quizInviteLine(),
   levelUpLine(5, 'Maratonista'),
   scoreLine(92), scoreLine(60), scoreLine(10), scoreLine(null),
   pendingQuizLine(3, 4), pendingQuizLine(3, 1),
@@ -28,7 +31,8 @@ const TODAS = [
 // dela em TODAS — senão ela escapa do contrato de voz sem ninguém notar.
 it('TODAS cobre toda fala exportada por lines.ts', () => {
   expect(Object.keys(lines).sort()).toEqual([
-    'chapterClosedTitle', 'greeting', 'levelUpLine', 'pendingQuizLine',
+    'chapterClosedTitle', 'chapterClosedTitleWithoutNumber', 'greeting', 'levelUpLine', 'pendingQuizLine',
+    'quizInviteLine',
     'quizStateLine', 'scoreLine', 'staleBookLine', 'streakLine', 'streakRiskLine',
   ].sort());
 });
@@ -84,6 +88,29 @@ describe('chapterClosedTitle', () => {
 
   it('conta quando sao varios', () => {
     expect(chapterClosedTitle([4, 5])).toBe('2 capítulos, fechados.');
+  });
+});
+
+// F4-15: a consulta dos capitulos falhou. O titulo nao inventa numero de
+// capitulo; a contagem vem dos ids que o servidor devolveu no registro.
+describe('chapterClosedTitleWithoutNumber', () => {
+  it('um capitulo: sem numero nenhum', () => {
+    expect(chapterClosedTitleWithoutNumber(1)).toBe('Capítulo fechado.');
+  });
+
+  it('mais de um: a contagem, no mesmo registro do titulo com numero', () => {
+    expect(chapterClosedTitleWithoutNumber(3)).toBe('3 capítulos, fechados.');
+  });
+
+  it('sem id nenhum, cai no singular sem numero em vez de "0 capítulos"', () => {
+    expect(chapterClosedTitleWithoutNumber(0)).toBe('Capítulo fechado.');
+  });
+});
+
+// F4-16: e fala do assistente (spec 7.3), entao mora aqui e nao na tela.
+describe('quizInviteLine', () => {
+  it('convida pro quiz com a fala da spec', () => {
+    expect(quizInviteLine()).toBe('Bora ver o que ficou?');
   });
 });
 

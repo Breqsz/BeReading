@@ -25,19 +25,48 @@ export interface ChapterGoal {
  * pagina 50 esta depois do capitulo 1 mas ANTES do inicio do capitulo 3 — o
  * leitor esta em algum ponto do capitulo 2, sem paginacao pra confirmar
  * onde. Apontar "capitulo 3" seria o mesmo numero chutado que a funcao
- * existe pra evitar. Por isso, quando o capitulo candidato tem `start_page`
- * numerico, so vira meta se `currentPage` ja alcancou esse inicio.
+ * existe pra evitar.
+ *
+ * A primeira correcao testou isso pelo `start_page` do candidato, e deixava
+ * um buraco que o proprio implementador declarou: capitulo com `end_page` e
+ * `start_page` nulo passava direto. As duas colunas sao nulaveis de forma
+ * independente, entao a mesma cena com o capitulo 3 sem `start_page` voltava
+ * a mentir.
+ *
+ * A pergunta de fundo e sempre a mesma: **da pra provar que o leitor esta
+ * dentro deste capitulo?** Existem duas provas independentes, e basta uma:
+ *
+ * - o candidato tem `start_page` numerico e a pagina atual ja o alcancou. Isso
+ *   fixa o leitor dentro dele, e nao importa o que veio antes;
+ * - o candidato nao tem `start_page`, e ai a unica saida e a corrida paginada:
+ *   se todo capitulo anterior tem `end_page`, o leitor provadamente passou por
+ *   todos, e o candidato termina depois da pagina atual.
+ *
+ * Sem nenhuma das duas, a posicao e indeterminada, e indeterminado nao vira
+ * numero na tela.
  */
 export function currentChapterGoal(
   chapters: Pick<Chapter, 'number' | 'start_page' | 'end_page'>[],
   currentPage: number,
 ): ChapterGoal | null {
   const ordenados = [...chapters].sort((a, b) => a.number - b.number);
-  const atual = ordenados.find(
+  const indice = ordenados.findIndex(
     (c) => typeof c.end_page === 'number' && c.end_page > currentPage,
   );
-  if (!atual || typeof atual.end_page !== 'number') return null;
-  if (typeof atual.start_page === 'number' && currentPage < atual.start_page) return null;
+  if (indice === -1) return null;
+
+  const atual = ordenados[indice];
+  if (typeof atual.end_page !== 'number') return null;
+
+  if (typeof atual.start_page === 'number') {
+    // Prova direta. Se a pagina atual ainda nao chegou ao inicio, ela cai no
+    // vao entre o capitulo anterior e este, que nao e capitulo nenhum.
+    if (currentPage < atual.start_page) return null;
+  } else {
+    // Sem inicio declarado, so a corrida paginada anterior prova a posicao.
+    const anteriores = ordenados.slice(0, indice);
+    if (anteriores.some((c) => typeof c.end_page !== 'number')) return null;
+  }
 
   return {
     chapterNumber: atual.number,

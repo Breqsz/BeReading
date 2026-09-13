@@ -91,6 +91,36 @@ describe('currentChapterGoal', () => {
     });
   });
 
+  // O buraco que sobrou da rodada de correcao 1, declarado pelo proprio
+  // implementador: as duas colunas sao nulaveis de forma INDEPENDENTE, entao
+  // um capitulo pode ter `end_page` e nao ter `start_page`. Nesse caso a prova
+  // pelo inicio nao existe, e a cena volta a mentir se ninguem olhar o que
+  // veio antes.
+  it('candidato com end_page mas SEM start_page, depois de um capitulo sem paginacao: sem meta', () => {
+    const chapters = [
+      chapter({ number: 1, start_page: 1, end_page: 30 }),
+      chapter({ number: 2, start_page: null, end_page: null }),
+      chapter({ number: 3, start_page: null, end_page: 90 }),
+    ];
+    // O leitor esta na 50: passou do capitulo 1, mas nada prova que passou do 2.
+    expect(currentChapterGoal(chapters, 50)).toBeNull();
+  });
+
+  // O contra-teste, que impede a regra acima de ir longe demais: sem furo
+  // nenhum antes, a falta de `start_page` no candidato nao atrapalha, porque a
+  // corrida paginada ja prova que o leitor chegou nele.
+  it('candidato sem start_page, mas com todos os anteriores paginados: a meta aparece', () => {
+    const chapters = [
+      chapter({ number: 1, start_page: 1, end_page: 30 }),
+      chapter({ number: 2, start_page: null, end_page: 90 }),
+    ];
+    expect(currentChapterGoal(chapters, 50)).toEqual({
+      chapterNumber: 2,
+      totalChapters: 2,
+      remainingPages: 40,
+    });
+  });
+
 });
 
 describe('daysSinceLastSession', () => {

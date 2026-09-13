@@ -76,7 +76,8 @@ const INITIAL_STATE = {
   streak: null as Streak | null,
   xp: 0,
   level: levelFor(0),
-  previous: { xp: 0, level: levelFor(0) },
+  previous: null,
+  carregado: false,
 };
 
 beforeEach(() => {
@@ -136,7 +137,10 @@ describe('useProgressStore', () => {
   });
 
   describe('instantâneo anterior (previous)', () => {
-    it('depois do primeiro refresh, previous guarda o que era atual antes dele', async () => {
+    // A primeira carga não é um ganho. Um leitor com 2400 de XP abrindo o app
+    // não "ganhou" 2400 agora, e se previous nascesse em zero qualquer tela que
+    // anime a partir dele contaria a vida inteira do usuário no cold start.
+    it('a primeira carga não inventa um ganho: previous continua nulo', async () => {
       mockedGetReadingSessions.mockResolvedValue([sessao(10)]);
       mockedGetMyAnswers.mockResolvedValue([]);
       mockedGetStudentBadges.mockResolvedValue([]);
@@ -145,43 +149,66 @@ describe('useProgressStore', () => {
       await useProgressStore.getState().refresh('u1');
 
       const state = useProgressStore.getState();
-      expect(state.previous).toEqual({ xp: 0, level: levelFor(0) });
+      expect(state.previous).toBeNull();
+      expect(state.carregado).toBe(true);
       expect(state.xp).toBe(50); // 10 páginas × XP_PER_PAGE
     });
 
-    it('um segundo refresh com XP maior avança previous para o valor anterior (não para 0)', async () => {
+    // O contra-teste do de cima, e o que impede a correção de ir longe demais:
+    // leitor novo tem XP zero de verdade, e o primeiro capítulo que ele fecha é
+    // o momento mais importante do produto. Se "primeira carga" fosse testada
+    // por `xp === 0` em vez de por `carregado`, esse ganho inaugural apareceria
+    // parado na tela.
+    it('o primeiro ganho de um leitor zerado anima, e não é confundido com cold start', async () => {
+      mockedGetReadingSessions.mockResolvedValue([]);
+      mockedGetMyAnswers.mockResolvedValue([]);
+      mockedGetStudentBadges.mockResolvedValue([]);
+      mockedGetStreak.mockResolvedValue(streak);
+      await useProgressStore.getState().refresh('u1'); // cold start, xp 0
+
+      expect(useProgressStore.getState().previous).toBeNull();
+
+      mockedGetReadingSessions.mockResolvedValue([sessao(5)]);
+      await useProgressStore.getState().refresh('u1'); // primeiro capítulo: 0 -> 25
+
+      const state = useProgressStore.getState();
+      expect(state.xp).toBe(25);
+      expect(state.previous).toEqual({ xp: 0, level: levelFor(0) });
+    });
+
+    it('um segundo refresh com XP maior avança previous para o valor anterior', async () => {
       mockedGetReadingSessions.mockResolvedValue([sessao(10)]);
       mockedGetMyAnswers.mockResolvedValue([]);
       mockedGetStudentBadges.mockResolvedValue([]);
       mockedGetStreak.mockResolvedValue(streak);
-      await useProgressStore.getState().refresh('u1'); // xp: 0 -> 50
+      await useProgressStore.getState().refresh('u1'); // carga inicial, xp 50
 
       mockedGetReadingSessions.mockResolvedValue([sessao(10), sessao(20)]);
       await useProgressStore.getState().refresh('u1'); // xp: 50 -> 150
 
       const state = useProgressStore.getState();
-      expect(state.previous.xp).toBe(50);
+      expect(state.previous).toEqual({ xp: 50, level: levelFor(50) });
       expect(state.xp).toBe(150);
     });
 
     // O bug que o brief pede para evitar: um segundo refresh que não traz
     // XP novo não pode sobrescrever previous com o valor que acabou de virar
     // "atual" — isso apagaria o intervalo que a tela de conquista anima.
-    it('um segundo refresh sem XP novo NÃO sobrescreve o instantâneo anterior', async () => {
-      const sessions = [sessao(10)];
-      mockedGetReadingSessions.mockResolvedValue(sessions);
+    it('um refresh sem XP novo NÃO sobrescreve o instantâneo anterior', async () => {
+      mockedGetReadingSessions.mockResolvedValue([sessao(10)]);
       mockedGetMyAnswers.mockResolvedValue([]);
       mockedGetStudentBadges.mockResolvedValue([]);
       mockedGetStreak.mockResolvedValue(streak);
+      await useProgressStore.getState().refresh('u1'); // carga inicial, xp 50
 
-      await useProgressStore.getState().refresh('u1'); // xp: 0 -> 50
-      expect(useProgressStore.getState().previous.xp).toBe(0);
+      mockedGetReadingSessions.mockResolvedValue([sessao(10), sessao(20)]);
+      await useProgressStore.getState().refresh('u1'); // xp: 50 -> 150, previous = 50
 
-      await useProgressStore.getState().refresh('u1'); // mesmos dados, xp continua 50
+      await useProgressStore.getState().refresh('u1'); // mesmos dados, xp continua 150
 
       const state = useProgressStore.getState();
-      expect(state.xp).toBe(50);
-      expect(state.previous.xp).toBe(0); // sobrevive ao segundo refresh
+      expect(state.xp).toBe(150);
+      expect(state.previous).toEqual({ xp: 50, level: levelFor(50) }); // sobreviveu
     });
   });
 });

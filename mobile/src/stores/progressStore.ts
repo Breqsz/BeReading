@@ -30,7 +30,24 @@ interface ProgressState {
   xp: number;
   level: LevelInfo;
 
-  previous: ProgressSnapshot;
+  /**
+   * `null` enquanto nunca houve carga: não existe "antes" ainda, e a tela deve
+   * mostrar o valor pronto em vez de animar.
+   *
+   * Nasceu `{ xp: 0 }` e virou nulo por decisão minha, não do implementador,
+   * que aliás levantou o caso. Com zero, o primeiro `refresh` de um leitor com
+   * 2400 de XP produz um "ganho" de 0 até 2400, e qualquer tela que anime a
+   * partir daqui faria o anel contar a vida inteira do usuário no cold start.
+   *
+   * Podia ser resolvido com uma heurística em cada tela ("não anima se previous
+   * for zero"), e é justamente isso que não pode: três telas decidindo o mesmo
+   * caso por conta própria é como o vocabulário de tom divergiu. Nulo obriga o
+   * TypeScript a cobrar o tratamento uma vez, no lugar certo.
+   */
+  previous: ProgressSnapshot | null;
+
+  /** Se algum `refresh` ja completou. Distingue "XP zero" de "sem dado". */
+  carregado: boolean;
 
   refresh: (userId: string) => Promise<void>;
 }
@@ -44,7 +61,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   streak: null,
   xp: 0,
   level: ZERO_LEVEL,
-  previous: { xp: 0, level: ZERO_LEVEL },
+  previous: null,
+  carregado: false,
 
   refresh: async (userId) => {
     const [sessions, answers, badges, streak] = await Promise.all([
@@ -69,8 +87,13 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     // a animação de contagem sumiria antes de a tela de conquista rodar.
     // Só avançamos `previous` quando o número efetivamente andou — e sempre
     // para o valor que era atual imediatamente antes deste refresh.
-    const { xp: currentXp, level: currentLevel, previous } = get();
-    const changed = xp !== currentXp;
+    //
+    // A primeira carga é a exceção, e precisa de `carregado`, não de "xp é
+    // zero": um leitor novo de verdade tem zero, e o primeiro capítulo que ele
+    // fecha é o momento mais importante do produto. Se o teste de primeira
+    // carga fosse `xp === 0`, esse ganho inaugural (0 para 25) seria confundido
+    // com "ainda não carregou" e a tela de conquista dele apareceria parada.
+    const { xp: currentXp, level: currentLevel, previous, carregado } = get();
 
     set({
       sessions,
@@ -79,7 +102,12 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       streak,
       xp,
       level,
-      previous: changed ? { xp: currentXp, level: currentLevel } : previous,
+      carregado: true,
+      previous: !carregado
+        ? null
+        : xp !== currentXp
+          ? { xp: currentXp, level: currentLevel }
+          : previous,
     });
   },
 }));

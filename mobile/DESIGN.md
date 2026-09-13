@@ -157,6 +157,18 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
 - **Toast**: confirmação transitória (registro salvo, conquista simples), via `ToastProvider`, no
   lugar de `Alert.alert`. Estados: entering (`motion.enter`); visible; exiting (`motion.exit`, ⅔
   da entrada). Não bloqueia interação por trás.
+- **Screen**: casca de toda tela. Pinta `color.bg`, aplica o inset superior real do aparelho e
+  reserva embaixo o espaço de `TAB_BAR_HEIGHT` mais o inset inferior, para que nenhum conteúdo
+  role atrás da barra. Variação por `scroll` (rolável ou fixa) e por `tabBar` (telas fora das abas
+  não reservam o espaço de baixo). Não é estado: é a única forma de uma tela conhecer a borda do
+  aparelho. Nenhuma tela lê `useSafeAreaInsets` por conta própria.
+- **TabBar**: as quatro abas (Hoje, Estante, Explorar, Você), sem entalhe em SVG e sem botão
+  flutuante — a ação de registrar leitura vive no contexto de cada tela. Estados por aba:
+  selected (`Tone` `primary` no ícone e no rótulo, que saem do mesmo tom, nunca de duas fontes) e
+  idle (`tertiary`). Tocar na aba já ativa não navega nem vibra. O rótulo vem do `title` da rota;
+  o ícone é fixo por nome de rota, porque é ativo de marca e não configuração de tela. Fundo
+  `color.surface1` com divisória `color.line` no topo, altura derivada de tokens mais o inset
+  inferior real.
 
 ## 6. Motion
 
@@ -215,6 +227,21 @@ sem infantilizar. Explicitamente não Duolingo: sem mascote, sem tom de aplicati
 
 **Sentimento alvo:** que o app pareça editorial e feito à mão, não um template genérico de
 gamificação. Um acento por tela. Métrica real, nunca inflada. Confiança sóbria, sem grito.
+
+**O marcador.** A marca é um marcador de página: um retângulo de topo arredondado com um entalhe
+em V embaixo. Ele aparece em dois recortes, e a diferença entre eles é regra, não descuido:
+
+- **`src/assistant/Glyph.tsx`**, dentro do app, tem dois olhos e é o rosto do assistente. Só ele
+  fala; onde houver Glyph, há fala vinda de `src/assistant/lines.ts`. Cor `color.accent` sobre
+  fundo escuro, traço casando com o das abas. É decorativo para leitor de tela: quem lê a fala é o
+  texto ao lado, e um "imagem" a mais só atrapalharia.
+- **`assets/brand/icon-mark.svg`**, nos ícones de sistema (app, splash, favicon), **não tem
+  olhos** e é cerca de 15% mais estreito. Descoberto na F3, gerando o ícone a 1024px: em tamanho
+  grande os dois pontos sobre a forma larga param de ler como marcador e viram cara. O ícone é a
+  marca do produto, não o mascote — e o projeto não tem mascote (ver referências acima).
+
+O SVG-fonte dos dois fica em `assets/brand/`, e os PNGs saem dele. PNG de ícone não se edita à
+mão: regenera-se do SVG.
 
 ## 9. Anti-patterns
 

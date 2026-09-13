@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import Svg, { Circle, Path } from 'react-native-svg';
 import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
-import { Text } from './Text';
+import { Text, TONE_COLOR, type Tone } from './Text';
 import { color, hitSlop, space, type as typeTokens, MIN_TOUCH } from '../theme/tokens';
 
 type IconProps = { size: number; color: string };
@@ -133,7 +133,12 @@ export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
       {TABS.map((tab) => {
         const route = state.routes.find((r) => r.name === tab.name);
         const selected = tab.name === activeName;
-        const tint = selected ? color.text : color.text3;
+        // Ícone e rótulo saem do MESMO tom. Antes eram duas fontes paralelas —
+        // `color.text`/`color.text3` no ícone e `'primary'`/`'tertiary'` no
+        // Text — que hoje calham de casar. Mudar TONE_COLOR faria a barra ficar
+        // com o ícone de uma cor e a palavra embaixo de outra, sem nada
+        // acusando. Aqui só existe `tone`; a cor do ícone é consequência.
+        const tone: Tone = selected ? 'primary' : 'tertiary';
         const label = resolveLabel(route ? descriptors[route.key]?.options : undefined, tab.fallbackLabel);
 
         const onPress = () => {
@@ -156,8 +161,8 @@ export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
             onPress={onPress}
             style={styles.item}
           >
-            <tab.Icon size={ICON_SIZE} color={tint} />
-            <Text variant="caption" tone={selected ? 'primary' : 'tertiary'}>
+            <tab.Icon size={ICON_SIZE} color={TONE_COLOR[tone]} />
+            <Text variant="caption" tone={tone}>
               {label}
             </Text>
           </Pressable>

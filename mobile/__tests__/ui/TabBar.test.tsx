@@ -118,4 +118,29 @@ describe('TabBar', () => {
     const { getByText } = render(<TabBar {...props} />);
     expect(getByText('Estante')).toBeTruthy();
   });
+
+  // Achado da revisao final da F3: icone e rotulo vinham de duas fontes
+  // paralelas (color.text/color.text3 no SVG, 'primary'/'tertiary' no Text) que
+  // por acaso davam na mesma cor. Uma troca em TONE_COLOR deixaria o icone de
+  // uma cor e a palavra embaixo de outra, sem nada acusando. Este teste compara
+  // as duas cores renderizadas: se divergirem de novo, reprova.
+  it('o icone e o rotulo da mesma aba tem exatamente a mesma cor', () => {
+    const { getByText, UNSAFE_getAllByType } = render(<TabBar {...makeProps(0)} />);
+    const { Path } = require('react-native-svg');
+
+    const corDoRotulo = (rotulo: string) =>
+      StyleSheet.flatten(getByText(rotulo).props.style).color;
+
+    // O Path da casinha (aba ativa) e o da estante (inativa) — primeiro traco
+    // de cada icone, na ordem em que as abas sao renderizadas.
+    const tracos = UNSAFE_getAllByType(Path);
+    const corAtiva = tracos[0].props.stroke;
+    const corInativa = tracos[1].props.stroke;
+
+    expect(corAtiva).toBe(corDoRotulo('Hoje'));
+    expect(corInativa).toBe(corDoRotulo('Estante'));
+    // E a ativa precisa mesmo se distinguir da inativa, senao o teste acima
+    // passaria com a barra inteira de uma cor so.
+    expect(corAtiva).not.toBe(corInativa);
+  });
 });

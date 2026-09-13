@@ -14,10 +14,10 @@ export default function TabsLayout() {
       tabBar={(props) => <TabBar {...props} />}
     >
       {/* Nomes de arquivo de rota (index, livros, catalogo, perfil) não mudam:
-          deep link depende deles. O TabBar novo ainda mapeia ícone e rótulo
-          por route.name, ignorando este `title` (limitação conhecida, sob
-          revisão), mas mesmo assim o title fica com o rótulo certo aqui, que
-          é o valor de registro da rota e o que qualquer outro consumidor lê. */}
+          deep link depende deles. O rótulo visível sai daqui: o TabBar lê
+          `title` (via resolveLabel) e só cai no fallback dele se a rota não
+          declarar nenhum. O ícone é o oposto, fixo por route.name, porque é
+          ativo de marca e não configuração de tela. */}
       <Tabs.Screen name="index" options={{ title: 'Hoje' }} />
       <Tabs.Screen name="livros" options={{ title: 'Estante' }} />
       <Tabs.Screen name="catalogo" options={{ title: 'Explorar' }} />

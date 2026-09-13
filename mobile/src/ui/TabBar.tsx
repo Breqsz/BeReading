@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import Svg, { Circle, Path } from 'react-native-svg';
+import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { Text } from './Text';
 import { color, hitSlop, space, type as typeTokens, MIN_TOUCH } from '../theme/tokens';
 
@@ -77,16 +78,34 @@ function PersonIcon({ size, color: c }: IconProps) {
 interface TabDef {
   /** Nome do arquivo de rota em app/(tabs), estável por causa do deep link. */
   name: string;
-  label: string;
+  /**
+   * Rótulo usado só quando a rota não declara `title`/`tabBarLabel` em
+   * `options` (ver `resolveLabel`). A Tarefa 4 já define `title` em cada
+   * `Tabs.Screen`; sem este fallback ele nunca teria efeito e a tela e a
+   * barra teriam duas fontes de verdade divergindo em silêncio.
+   */
+  fallbackLabel: string;
   Icon: React.ComponentType<IconProps>;
 }
 
+// O ícone continua fixo por route.name: é ativo de marca, não configuração
+// de tela (decisão da rodada de correção 1). O rótulo, ao contrário, lê de
+// `options` — ver resolveLabel abaixo.
 const TABS: TabDef[] = [
-  { name: 'index', label: 'Hoje', Icon: HomeIcon },
-  { name: 'livros', label: 'Estante', Icon: ShelfIcon },
-  { name: 'catalogo', label: 'Explorar', Icon: CompassIcon },
-  { name: 'perfil', label: 'Você', Icon: PersonIcon },
+  { name: 'index', fallbackLabel: 'Hoje', Icon: HomeIcon },
+  { name: 'livros', fallbackLabel: 'Estante', Icon: ShelfIcon },
+  { name: 'catalogo', fallbackLabel: 'Explorar', Icon: CompassIcon },
+  { name: 'perfil', fallbackLabel: 'Você', Icon: PersonIcon },
 ];
+
+// tabBarLabel pode ser string ou uma função de render (tipo da lib); só o
+// primeiro caso interessa aqui, porque o rótulo da barra é sempre texto
+// simples. title é sempre string quando presente.
+function resolveLabel(options: BottomTabNavigationOptions | undefined, fallback: string): string {
+  if (typeof options?.tabBarLabel === 'string') return options.tabBarLabel;
+  if (options?.title) return options.title;
+  return fallback;
+}
 
 const ICON_SIZE = 22;
 
@@ -98,12 +117,13 @@ const ICON_SIZE = 22;
 export const TAB_BAR_HEIGHT =
   space.sm * 2 + ICON_SIZE + space.xs + typeTokens.caption.lineHeight;
 
-export function TabBar({ state, navigation }: BottomTabBarProps) {
+export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const activeName = state.routes[state.index]?.name;
 
   return (
     <View
+      testID="tab-bar"
       accessibilityRole="tablist"
       style={[
         styles.wrap,
@@ -111,8 +131,10 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
       ]}
     >
       {TABS.map((tab) => {
+        const route = state.routes.find((r) => r.name === tab.name);
         const selected = tab.name === activeName;
         const tint = selected ? color.text : color.text3;
+        const label = resolveLabel(route ? descriptors[route.key]?.options : undefined, tab.fallbackLabel);
 
         const onPress = () => {
           // Critério de aceite: nenhum haptic nem navegação ao tocar na aba
@@ -128,7 +150,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
           <Pressable
             key={tab.name}
             accessibilityRole="tab"
-            accessibilityLabel={tab.label}
+            accessibilityLabel={label}
             accessibilityState={{ selected }}
             hitSlop={hitSlop}
             onPress={onPress}
@@ -136,7 +158,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
           >
             <tab.Icon size={ICON_SIZE} color={tint} />
             <Text variant="caption" tone={selected ? 'primary' : 'tertiary'}>
-              {tab.label}
+              {label}
             </Text>
           </Pressable>
         );

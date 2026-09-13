@@ -44,6 +44,15 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const temCabecalho = Boolean(title || subtitle || onBack || headerRight);
 
+  // Achado 3 da rodada de correção 1: 'bottom' em edges significa tela sem
+  // tab bar (é o próprio comentário da prop, acima), e nesse caminho o
+  // insets.bottom já entra uma vez no View raiz logo abaixo, sem barra
+  // nenhuma para reservar espaço. Somar TAB_BAR_HEIGHT + insets.bottom de
+  // novo aqui dobrava a margem inferior e reservava espaço de uma barra que
+  // a tela não tem.
+  const semTabBar = edges.includes('bottom');
+  const reservaInferior = semTabBar ? 0 : TAB_BAR_HEIGHT + insets.bottom;
+
   const cabecalho = temCabecalho ? (
     <View style={styles.header}>
       {onBack ? (
@@ -61,16 +70,19 @@ export function Screen({
     </View>
   ) : null;
 
-  // Reserva do fim do scroll para o conteudo nao ficar atras da TabBar: a
-  // constante vem do proprio componente da barra (Tarefa 3), nunca de um
-  // numero solto que desalinha assim que a altura da barra mudar.
+  // Reserva do fim do conteudo para nao ficar atras da TabBar: a constante
+  // vem do proprio componente da barra (Tarefa 3), nunca de um numero solto
+  // que desalinha assim que a altura da barra mudar. Achado 4 da rodada de
+  // correcao 1: o caminho sem scroll usava a mesma reserva de zero do
+  // caminho com scroll, armadilha viva para telas sem scroll da F4 em
+  // diante — agora os dois caminhos usam a mesma `reservaInferior`.
   const conteudo = scroll ? (
     <ScrollView
       testID="screen-scroll"
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: TAB_BAR_HEIGHT + insets.bottom },
+        { paddingBottom: reservaInferior },
         contentStyle,
       ]}
       refreshControl={
@@ -82,7 +94,12 @@ export function Screen({
       {children}
     </ScrollView>
   ) : (
-    <View style={[styles.content, styles.semScroll, contentStyle]}>{children}</View>
+    <View
+      testID="screen-content"
+      style={[styles.content, styles.semScroll, { paddingBottom: reservaInferior }, contentStyle]}
+    >
+      {children}
+    </View>
   );
 
   return (

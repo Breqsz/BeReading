@@ -87,4 +87,33 @@ describe('Screen', () => {
     );
     expect(UNSAFE_getByType(ScrollView).props.showsVerticalScrollIndicator).toBe(false);
   });
+
+  // Achado 3 da rodada de correcao 1: com 'bottom' em edges (tela sem tab
+  // bar), o insets.bottom nao pode entrar duas vezes (raiz + scroll), e a
+  // reserva de TAB_BAR_HEIGHT nao faz sentido numa tela sem barra.
+  it('com edges incluindo bottom, nao soma TAB_BAR_HEIGHT nem repete o inset no scroll', () => {
+    const { getByTestId, UNSAFE_getByType } = render(
+      <Screen edges={['top', 'bottom']}><RNText>conteudo</RNText></Screen>,
+    );
+    const raiz = getByTestId('screen-root').props.style;
+    const paddingBottomRaiz = Array.isArray(raiz)
+      ? raiz.find((x) => x?.paddingBottom)?.paddingBottom
+      : raiz.paddingBottom;
+    expect(paddingBottomRaiz).toBe(34);
+
+    const scrollStyle = UNSAFE_getByType(ScrollView).props.contentContainerStyle;
+    const flat = Array.isArray(scrollStyle) ? Object.assign({}, ...scrollStyle.filter(Boolean)) : scrollStyle;
+    expect(flat.paddingBottom).toBe(0);
+  });
+
+  // Achado 4 da rodada de correcao 1: scroll={false} nao reservava espaco
+  // nenhum para a tab bar, armadilha viva para as telas da F4.
+  it('com scroll={false}, reserva o mesmo espaco de tab bar do caminho com scroll', () => {
+    const { getByTestId } = render(
+      <Screen scroll={false}><RNText>conteudo</RNText></Screen>,
+    );
+    const s = getByTestId('screen-content').props.style;
+    const flat = Array.isArray(s) ? Object.assign({}, ...s.filter(Boolean)) : s;
+    expect(flat.paddingBottom).toBe(TAB_BAR_HEIGHT + 34);
+  });
 });

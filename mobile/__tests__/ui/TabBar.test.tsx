@@ -1,4 +1,5 @@
 import { render, fireEvent } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { TabBar, TAB_BAR_HEIGHT } from '../../src/ui/TabBar';
 import { MIN_TOUCH } from '../../src/theme/tokens';
 
@@ -9,11 +10,22 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
 }));
 
+// Sobrescreve o mock global (insets zerados, ver jest.setup.ui.js) com
+// valores nao redondos de proposito, mesmo padrao do Screen.test.tsx: sem
+// isso, uma regressao que trocasse insets.bottom por 0 passaria pela suite
+// inteira sem acusar nada (era exatamente o defeito da barra antiga, com
+// faixa fixa de 28px). O componente le o inset pelo proprio hook, nao pela
+// prop `insets` de BottomTabBarProps — por isso o mock de modulo, nao um
+// valor no objeto de props.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
+}));
+
 import * as Haptics from 'expo-haptics';
 
 // Os nomes de rota nao mudam (deep link): index, livros, catalogo, perfil.
 // Ver src/components/CustomTabBar.tsx, que usa os mesmos quatro.
-function makeProps(activeIndex = 0) {
+function makeProps(activeIndex = 0, descriptors: Record<string, { options: any }> = {}) {
   const routes = [
     { key: 'index', name: 'index' },
     { key: 'livros', name: 'livros' },
@@ -23,8 +35,10 @@ function makeProps(activeIndex = 0) {
   return {
     state: { routes, index: activeIndex } as any,
     navigation: { navigate: jest.fn() } as any,
-    descriptors: {} as any,
+    // So bate a forma de BottomTabBarProps: o componente usa o proprio
+    // useSafeAreaInsets(), mockado acima, nao esta prop.
     insets: { top: 0, bottom: 0, left: 0, right: 0 },
+    descriptors: descriptors as any,
   };
 }
 
@@ -66,12 +80,42 @@ describe('TabBar', () => {
     expect(getByLabelText('Você').props.accessibilityState.selected).toBe(false);
   });
 
-  it('cada aba declara accessibilityRole tab', () => {
+  // Achado 6 da rodada 1: o teste anterior conferia so a primeira aba,
+  // embora o criterio de aceite diga "cada aba".
+  it('cada uma das quatro abas declara accessibilityRole tab', () => {
     const { getByLabelText } = render(<TabBar {...makeProps()} />);
     expect(getByLabelText('Hoje').props.accessibilityRole).toBe('tab');
+    expect(getByLabelText('Estante').props.accessibilityRole).toBe('tab');
+    expect(getByLabelText('Explorar').props.accessibilityRole).toBe('tab');
+    expect(getByLabelText('Você').props.accessibilityRole).toBe('tab');
   });
 
   it('TAB_BAR_HEIGHT e maior que o alvo minimo de toque', () => {
     expect(TAB_BAR_HEIGHT).toBeGreaterThan(MIN_TOUCH);
+  });
+
+  // Achado 1 da rodada 1: sem este teste, trocar TAB_BAR_HEIGHT + insets.bottom
+  // por TAB_BAR_HEIGHT + 0 passava pela suite inteira sem acusar nada — a
+  // barra antiga, com faixa fixa, tinha exatamente esse defeito.
+  it('a altura e o paddingBottom da barra vem de insets.bottom reais, nao de zero', () => {
+    const { getByTestId } = render(<TabBar {...makeProps()} />);
+    const s = StyleSheet.flatten(getByTestId('tab-bar').props.style);
+    expect(s.height).toBe(TAB_BAR_HEIGHT + 34);
+    expect(s.paddingBottom).toBe(34);
+  });
+
+  // Achado 2 da rodada 1: a Tarefa 4 define `title` em cada Tabs.Screen; sem
+  // ler options aqui, esse title nunca tinha efeito na barra.
+  it('usa o title de options quando presente, em vez do rotulo interno', () => {
+    const props = makeProps(0, { livros: { options: { title: 'Minha Estante' } } });
+    const { getByText, queryByText } = render(<TabBar {...props} />);
+    expect(getByText('Minha Estante')).toBeTruthy();
+    expect(queryByText('Estante')).toBeNull();
+  });
+
+  it('sem title nem tabBarLabel em options, cai no rotulo interno (fallback)', () => {
+    const props = makeProps(0, { livros: { options: {} } });
+    const { getByText } = render(<TabBar {...props} />);
+    expect(getByText('Estante')).toBeTruthy();
   });
 });

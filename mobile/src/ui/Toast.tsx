@@ -74,7 +74,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           // substitui os Alert.alert nativos, esses sim anunciados) fica mudo
           // para quem usa leitor de tela.
           accessibilityLiveRegion="polite"
-          style={[styles.wrap, elevation.floating, { bottom: insets.bottom + TAB_BAR_HEIGHT }]}
+          // TAB_BAR_HEIGHT é a altura total da barra (ver TabBar.tsx): sem
+          // um respiro a mais, o toast encostava nela. space.md dá essa
+          // folga (achado 5 da rodada de correção 1).
+          style={[
+            styles.wrap,
+            elevation.floating,
+            { bottom: insets.bottom + TAB_BAR_HEIGHT + space.md },
+          ]}
         >
           <View style={[styles.indicatorHalo, { backgroundColor: TONE_INDICATOR[toast.tone ?? 'info'].halo }]}>
             <View

@@ -146,14 +146,3 @@ export function chooseAssistantReason({
 
   return null;
 }
-
-/**
- * XP no padrao pt-BR (ponto como separador de milhar). Sem `Intl`: o
- * ambiente do Hermes varia por build, e uma conta de string simples e
- * determinada em qualquer um deles.
- */
-export function formatXp(n: number): string {
-  const inteiro = Math.round(Math.abs(n));
-  const agrupado = String(inteiro).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return n < 0 ? `-${agrupado}` : agrupado;
-}

@@ -221,7 +221,7 @@ describe('successToast', () => {
   });
 
   it('XP com separador de milhar', () => {
-    // 250 x 5: sem Intl de proposito, mesmo motivo de formatXp (src/features/home/logic.ts).
+    // 250 x 5: sem Intl de proposito, mesmo motivo de formatXp (src/game/xp.ts).
     expect(successToast(250, 3).detail).toBe('+1.250 XP · 3 dias seguidos');
   });
 });

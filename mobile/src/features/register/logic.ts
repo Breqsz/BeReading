@@ -2,10 +2,9 @@
 // React e sem primitivo visual: so dado e conta, para o teste checar produto e
 // nao forma.
 import type { Chapter } from '../../types/database';
-import { XP_PER_PAGE } from '../../game/xp';
+import { XP_PER_PAGE, formatXp } from '../../game/xp';
 import { validatePageRange } from '../../utils/validation';
 import { pagesAlreadyRead } from '../../utils/registerReading';
-import { formatXp } from '../home/logic';
 
 export type ChapterPages = Pick<Chapter, 'id' | 'number' | 'end_page'>;
 

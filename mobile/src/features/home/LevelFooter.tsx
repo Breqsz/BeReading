@@ -2,8 +2,7 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 import { color, space } from '../../theme/tokens';
-import { formatXp } from './logic';
-import type { LevelInfo } from '../../game/xp';
+import { formatXp, type LevelInfo } from '../../game/xp';
 
 interface Props {
   level: LevelInfo;

@@ -1,4 +1,4 @@
-import { xpFromPages, xpFromScores, totalXp, levelFor, XP_PER_PAGE, XP_PER_BADGE } from '../../src/game/xp';
+import { xpFromPages, xpFromScores, totalXp, levelFor, formatXp, XP_PER_PAGE, XP_PER_BADGE } from '../../src/game/xp';
 
 const avaliada = (score: number) => ({ comprehension_score: score, evaluation_status: 'completed' });
 
@@ -76,5 +76,25 @@ describe('levelFor', () => {
   it('XP negativo ou inválido não quebra: cai no nível 1', () => {
     expect(levelFor(-10).level).toBe(1);
     expect(levelFor(Number.NaN).level).toBe(1);
+  });
+});
+
+// Veio de src/features/home/logic.ts (F4-22): Hoje, registro e conquista
+// mostram XP, e a formatacao e do jogo, nao de uma tela.
+describe('formatXp', () => {
+  it('agrupa milhar com ponto, no padrao pt-BR', () => {
+    expect(formatXp(1840)).toBe('1.840');
+  });
+
+  it('nao agrupa numero pequeno', () => {
+    expect(formatXp(50)).toBe('50');
+  });
+
+  it('agrupa milhoes com dois pontos', () => {
+    expect(formatXp(1234567)).toBe('1.234.567');
+  });
+
+  it('zero permanece zero', () => {
+    expect(formatXp(0)).toBe('0');
   });
 });

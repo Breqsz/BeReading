@@ -7,6 +7,6 @@ export { LevelFooter } from './LevelFooter';
 export { HomeSkeleton } from './HomeSkeleton';
 export { HomeEmptyState } from './HomeEmptyState';
 export {
-  currentChapterGoal, daysSinceLastSession, readSessionToday, chooseAssistantReason, formatXp,
+  currentChapterGoal, daysSinceLastSession, readSessionToday, chooseAssistantReason,
 } from './logic';
 export type { ChapterGoal, AssistantReason } from './logic';

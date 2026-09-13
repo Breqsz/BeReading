@@ -3,7 +3,6 @@ import {
   daysSinceLastSession,
   readSessionToday,
   chooseAssistantReason,
-  formatXp,
 } from '../../../src/features/home/logic';
 import type { Chapter, ReadingSession } from '../../../src/types/database';
 
@@ -213,23 +212,5 @@ describe('chooseAssistantReason', () => {
       now: new Date('2026-09-13T14:00:00.000Z'), // manha em SP
     });
     expect(r).toBeNull();
-  });
-});
-
-describe('formatXp', () => {
-  it('agrupa milhar com ponto, no padrao pt-BR', () => {
-    expect(formatXp(1840)).toBe('1.840');
-  });
-
-  it('nao agrupa numero pequeno', () => {
-    expect(formatXp(50)).toBe('50');
-  });
-
-  it('agrupa milhoes com dois pontos', () => {
-    expect(formatXp(1234567)).toBe('1.234.567');
-  });
-
-  it('zero permanece zero', () => {
-    expect(formatXp(0)).toBe('0');
   });
 });

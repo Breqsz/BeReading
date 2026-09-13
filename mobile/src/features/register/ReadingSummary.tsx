@@ -9,7 +9,7 @@ import { Card } from '../../ui/Card';
 import { Text } from '../../ui/Text';
 import { Tag } from '../../ui/Tag';
 import { space } from '../../theme/tokens';
-import { formatXp } from '../home/logic';
+import { formatXp } from '../../game/xp';
 
 interface Props {
   /** `null` enquanto o intervalo nao e valido. */

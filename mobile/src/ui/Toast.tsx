@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
+import { TAB_BAR_HEIGHT } from './TabBar';
 import { color, elevation, motion, radius, space } from '../theme/tokens';
 
 export interface ToastOptions {
@@ -14,12 +15,6 @@ export interface ToastOptions {
 }
 
 const DURATION_MS = 4000;
-
-// A CustomTabBar legada (BAR_H 72 + faixa fixa de 28) nao expoe sua altura via
-// inset real. Ate a F3 trazer a tab bar nova com insets de verdade, o toast
-// sobe por este valor fixo para nao ficar atras dela; a conferencia visual
-// fina fica para a F8.
-const TAB_BAR_CLEARANCE = 90;
 
 // Ponto indicador a esquerda do texto: sem ele, toast de erro e de sucesso sao
 // visualmente identicos, e quem le rapido nao distingue os dois.
@@ -79,7 +74,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           // substitui os Alert.alert nativos, esses sim anunciados) fica mudo
           // para quem usa leitor de tela.
           accessibilityLiveRegion="polite"
-          style={[styles.wrap, elevation.floating, { bottom: insets.bottom + TAB_BAR_CLEARANCE }]}
+          style={[styles.wrap, elevation.floating, { bottom: insets.bottom + TAB_BAR_HEIGHT }]}
         >
           <View style={[styles.indicatorHalo, { backgroundColor: TONE_INDICATOR[toast.tone ?? 'info'].halo }]}>
             <View

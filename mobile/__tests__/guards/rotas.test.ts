@@ -50,8 +50,22 @@ for (const arquivo of ARQUIVOS) {
   }
 }
 
-/** Alvos de navegacao escritos como string literal em `app/`. */
-function alvosDe(codigo: string): string[] {
+/** Remove comentario de bloco e de linha, pra nao ler codigo que nao roda. */
+function semComentario(codigo: string): string {
+  return codigo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
+/**
+ * Alvos de navegacao escritos como string literal em `app/`.
+ *
+ * Ignora comentario: `app/chapter-complete.tsx` tem um comentario explicando
+ * que o sheet de registrar leitura vai chamar `router.replace('/chapter-complete')`
+ * na F4. Sem esta limpeza a guarda lia isso como navegacao real e inventava uma
+ * aresta que nao existe no app — e uma aresta inventada tanto pode passar
+ * sozinha quanto reprovar uma tela por um caminho que ninguem percorre.
+ */
+function alvosDe(bruto: string): string[] {
+  const codigo = semComentario(bruto);
   const achados = [
     ...codigo.matchAll(/pathname:\s*'([^']+)'/g),
     ...codigo.matchAll(/router\.(?:push|replace|navigate)\(\s*'([^']+)'/g),
@@ -65,10 +79,10 @@ const NAVEGACOES = ARQUIVOS.flatMap((arquivo) =>
 );
 
 /** Componente cujo corpo inteiro e um `<Redirect ...>`, sem ramo nenhum. */
-function soRedireciona(codigo: string): boolean {
-  const semComentario = codigo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  if (!/\bRedirect\b/.test(semComentario)) return false;
-  const retornos = [...semComentario.matchAll(/return\s*(\(\s*)?<\s*(\w+)/g)].map((m) => m[2]);
+function soRedireciona(bruto: string): boolean {
+  const codigo = semComentario(bruto);
+  if (!/\bRedirect\b/.test(codigo)) return false;
+  const retornos = [...codigo.matchAll(/return\s*(\(\s*)?<\s*(\w+)/g)].map((m) => m[2]);
   return retornos.length > 0 && retornos.every((tag) => tag === 'Redirect');
 }
 
@@ -133,6 +147,20 @@ describe('guarda: a leitura de rota funciona', () => {
       export default function Tela() { return <View />; }
     `;
     expect(soRedireciona(comentado)).toBe(false);
+  });
+
+  // Defeito real desta guarda, achado no mesmo dia em que ela nasceu:
+  // app/chapter-complete.tsx explica num comentario que a F4 vai chamar
+  // router.replace('/chapter-complete'), e a guarda contava isso como aresta.
+  it('nao le alvo de navegacao dentro de comentario', () => {
+    const comentado = `
+      // o sheet vai chamar router.replace('/chapter-complete') na F4
+      /* e o antigo era pathname: '/reading-success' */
+      export default function Tela() {
+        return <Pressable onPress={() => router.push('/quiz/summary')} />;
+      }
+    `;
+    expect(alvosDe(comentado)).toEqual(['/quiz/summary']);
   });
 
   it('todas as rotas do disco entraram no mapa', () => {

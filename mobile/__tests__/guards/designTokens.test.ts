@@ -88,6 +88,10 @@ const EXCECAO_APP_LEGADO = new Set([
   'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
   'app/register-reading.tsx',
+  // Volta da F3: o redirect que substituiu esta tela apagou a confirmacao do
+  // caminho mais comum do app. Sai da lista quando a F4 Tarefa 5 apagar o
+  // arquivo.
+  'app/reading-success.tsx',
 ]);
 
 function arquivos(dir: string): string[] {

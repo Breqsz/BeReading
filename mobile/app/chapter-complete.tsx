@@ -1,46 +1,100 @@
-// Capítulo fechado (spec S7.3): rota nova desta fase. Substitui o
-// Alert.alert("Capítulo completo!") antigo. A apresentação (fullScreenModal)
-// é configurada em app/_layout.tsx.
+// Capitulo fechado (spec S7.3, F4 Tarefa 6): substitui o Alert.alert("Capitulo
+// completo!") antigo, no momento mais importante do produto. A apresentacao
+// (fullScreenModal) e configurada em app/_layout.tsx.
 //
-// Aqui é só placeholder (Tarefa 4): a rota já existe com o contrato de params
-// certo, mas o conteúdo real (anel de XP contando de xpBefore até o XP atual,
-// chips de "+X XP" e sequência, qual capítulo abre o quiz quando chapterIds
-// tem mais de um, texto de subida de nível) é da F4.
+// Aqui ficam dado e navegacao; a composicao vem de src/features/chapter-complete.
+// O XP sai do progressStore, que o sheet de registrar leitura recalcula antes de
+// navegar pra ca (spec S7.2 e S8). Os numeros dos capitulos saem do banco,
+// porque os params so trazem ids (F4-15).
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Screen, Text, Button, Glyph } from '../src/ui';
-import { space } from '../src/theme/tokens';
+import { useProgressStore } from '../src/stores/progressStore';
+import { getChaptersByIds } from '../src/api/queries';
+import { quizInviteLine } from '../src/assistant/lines';
+import { Button, Screen } from '../src/ui';
+import {
+  ChapterCompleteSkeleton, ClosedChapterHeader, GainTags, XpRing, chapterCompleteLayout,
+  chapterTargets, closedTitle, parseParams, streakTagLabel, xpGained, xpPlan, xpTagLabel,
+  type ChapterCompleteRawParams,
+} from '../src/features/chapter-complete';
+import type { Chapter } from '../src/types/database';
+
+type Carga = { estado: 'carregando' } | { estado: 'pronto'; capitulos: Chapter[] | null };
 
 export default function ChapterCompleteScreen() {
   const router = useRouter();
+  const bruto = useLocalSearchParams<ChapterCompleteRawParams>();
 
-  // Recebidos para o contrato da rota já sair certo (chapterIds, bookId,
-  // pagesRead, streak, xpBefore vêm de router.replace('/chapter-complete', …)
-  // no sheet de registrar leitura, spec S7.2). Quem os consome é a F4.
-  useLocalSearchParams<{
-    chapterIds?: string;
-    bookId?: string;
-    pagesRead?: string;
-    streak?: string;
-    xpBefore?: string;
-  }>();
+  // Lidos uma vez, na montagem. Os params de uma rota montada nao mudam, e o XP
+  // fica congelado de proposito: um refresh no meio da tela mudaria o alvo e
+  // reiniciaria a contagem.
+  const [params] = useState(() => parseParams(bruto));
+  const [progresso] = useState(() => {
+    const { xp, level, carregado } = useProgressStore.getState();
+    return { xp, level, carregado };
+  });
+
+  const ids = params.chapterIds;
+  const [carga, setCarga] = useState<Carga>(() =>
+    ids.length > 0 ? { estado: 'carregando' } : { estado: 'pronto', capitulos: null },
+  );
+
+  useEffect(() => {
+    if (ids.length === 0) return;
+    let cancelado = false;
+    getChaptersByIds(ids)
+      .then((capitulos) => {
+        if (!cancelado) setCarga({ estado: 'pronto', capitulos });
+      })
+      // F4-15: sem os numeros a tela segue, sem inventar nenhum.
+      .catch(() => {
+        if (!cancelado) setCarga({ estado: 'pronto', capitulos: null });
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [ids]);
+
+  if (carga.estado === 'carregando') {
+    return (
+      <Screen edges={['top', 'bottom']} contentStyle={styles.content}>
+        <ChapterCompleteSkeleton />
+      </Screen>
+    );
+  }
+
+  const alvos = chapterTargets(ids, carga.capitulos);
+  const quiz = alvos.quizChapterId;
+  const plano = xpPlan({
+    xpBefore: params.xpBefore,
+    gained: xpGained(params.pagesRead) ?? 0,
+    storeXp: progresso.xp,
+    storeLevel: progresso.level,
+    loaded: progresso.carregado,
+  });
 
   return (
-    <Screen scroll={false}>
-      <View style={styles.centro}>
-        <Glyph size={40} />
-        <Text variant="title">Capítulo fechado</Text>
-        <Button onPress={() => router.back()}>Voltar</Button>
+    <Screen edges={['top', 'bottom']} contentStyle={styles.content}>
+      <View style={chapterCompleteLayout.corpo}>
+        <ClosedChapterHeader
+          title={closedTitle(alvos.numbers, ids.length)}
+          invite={quiz ? quizInviteLine() : null}
+        />
+        {plano ? <XpRing plan={plano} /> : null}
+        <GainTags xp={xpTagLabel(params.pagesRead)} streak={streakTagLabel(params.streak)} />
+      </View>
+      <View style={chapterCompleteLayout.acoes}>
+        {/* replace: a conquista nao fica na pilha atras do quiz. */}
+        {quiz ? <Button onPress={() => router.replace(`/quiz/${quiz}`)}>Bora pro quiz</Button> : null}
+        {/* back, nunca replace da pilha: volta pra onde o leitor abriu o registro. */}
+        <Button variant="ghost" onPress={() => router.back()}>Depois</Button>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  centro: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space.lg,
-  },
+  // A moldura (miolo no centro, botoes embaixo) precisa da altura inteira.
+  content: { flexGrow: 1 },
 });

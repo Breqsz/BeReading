@@ -105,7 +105,26 @@ export default function RootLayout() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <View style={{ flex: 1, backgroundColor: color.bg }}>
         <ToastProvider>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }}>
+            {/* Sheet de registrar leitura (spec S6/S7.2): meia tela por padrão,
+                arrastável até tela cheia, com grabber visível. */}
+            <Stack.Screen
+              name="register-reading"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.7, 1],
+                sheetGrabberVisible: true,
+              }}
+            />
+            {/* Quiz e resumo viram modal de tela cheia: é uma conversa, não faz
+                sentido a tab bar aparecer atrás. */}
+            <Stack.Screen name="quiz/[chapterId]" options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="quiz/summary" options={{ presentation: 'fullScreenModal' }} />
+            {/* Rota nova da Tarefa 4 (placeholder nesta fase, conteúdo real na
+                F4): mesma apresentação do quiz, por ser a tela de conquista que
+                antecede ele. */}
+            <Stack.Screen name="chapter-complete" options={{ presentation: 'fullScreenModal' }} />
+          </Stack>
         </ToastProvider>
       </View>
     </SafeAreaProvider>

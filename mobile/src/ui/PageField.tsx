@@ -17,9 +17,17 @@ interface Props {
    * em foco (spec S7.2).
    */
   autoFocus?: boolean;
+  /**
+   * Estado disabled do Field (DESIGN.md secao 5): nao edita, numero em text3 e
+   * anunciado como desabilitado. O sheet de registro trava os campos enquanto
+   * envia.
+   */
+  disabled?: boolean;
 }
 
-export function PageField({ label, value, onChange, placeholder, max, accessibilityLabel, autoFocus }: Props) {
+export function PageField({
+  label, value, onChange, placeholder, max, accessibilityLabel, autoFocus, disabled = false,
+}: Props) {
   const [focused, setFocused] = useState(false);
   const maxLength = max ? String(max).length : 4;
 
@@ -30,6 +38,8 @@ export function PageField({ label, value, onChange, placeholder, max, accessibil
         <TextInput
           value={value}
           accessibilityLabel={accessibilityLabel}
+          accessibilityState={{ disabled }}
+          editable={!disabled}
           // Pagina nao tem letra: o teclado numerico ainda deixa colar texto.
           onChangeText={(t) => onChange(t.replace(/[^0-9]/g, ''))}
           onFocus={() => setFocused(true)}
@@ -39,7 +49,7 @@ export function PageField({ label, value, onChange, placeholder, max, accessibil
           keyboardType="number-pad"
           autoFocus={autoFocus}
           maxLength={maxLength}
-          style={styles.input}
+          style={[styles.input, disabled ? styles.inputInativo : null]}
         />
       </View>
     </View>
@@ -69,4 +79,5 @@ const styles = StyleSheet.create({
     fontSize: typeTokens.numericXL.fontSize,
     letterSpacing: typeTokens.numericXL.letterSpacing,
   },
+  inputInativo: { color: color.text3 },
 });

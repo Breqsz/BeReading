@@ -26,6 +26,18 @@ describe('Chip', () => {
     fireEvent.press(getByRole('button'));
     expect(onPress).toHaveBeenCalled();
   });
+
+  // DESIGN.md secao 5 lista "disabled" no Chip. O sheet de registro trava os
+  // atalhos enquanto envia (Ruling F4-18).
+  it('desabilitado: nao chama onPress, avisa o leitor de tela e apaga o rotulo', () => {
+    const onPress = jest.fn();
+    const { getByRole, getByText } = render(<Chip label="+10" disabled onPress={onPress} />);
+    const chip = getByRole('button');
+    expect(chip.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    fireEvent.press(chip);
+    expect(onPress).not.toHaveBeenCalled();
+    expect(StyleSheet.flatten(getByText('+10').props.style).color).toBe(color.text3);
+  });
 });
 
 describe('Segmented', () => {

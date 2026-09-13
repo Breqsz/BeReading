@@ -91,6 +91,18 @@ describe('PageField', () => {
     expect(getByLabelText('Página final').props.autoFocus).toBe(true);
   });
 
+  // DESIGN.md secao 5: PageField tem os estados do Field, disabled incluido. O
+  // sheet de registro trava os campos enquanto envia (Ruling F4-18).
+  it('desabilitado: nao edita, avisa o leitor de tela e apaga o numero', () => {
+    const { getByLabelText } = render(
+      <PageField label="De" value="85" onChange={jest.fn()} disabled accessibilityLabel="Página inicial" />,
+    );
+    const input = getByLabelText('Página inicial');
+    expect(input.props.editable).toBe(false);
+    expect(input.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(StyleSheet.flatten(input.props.style).color).toBe(color.text3);
+  });
+
   it('limita o tamanho pelo total de paginas do livro', () => {
     const { getByLabelText } = render(
       <PageField label="Até" value="" onChange={jest.fn()} max={215} accessibilityLabel="Página final" />,

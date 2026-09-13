@@ -17,6 +17,7 @@ export { EmptyState } from './EmptyState';
 export { Banner } from './Banner';
 export type { BannerTone } from './Banner';
 export { ListRow } from './ListRow';
+export { Card } from './Card';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastOptions } from './Toast';
 export { TabBar, TAB_BAR_HEIGHT } from './TabBar';

@@ -16,12 +16,20 @@ export interface ChapterGoal {
  * BER-72: a migration deixou `start_page`/`end_page` opcionais em `chapters`
  * (nem toda fonte de catalogo tem paginacao por capitulo). Um capitulo sem
  * `end_page` nao pode virar meta: mostrar numero chutado e pior que nao
- * mostrar nada. Por isso o capitulo corrente e o PRIMEIRO, em ordem de
+ * mostrar nada. Por isso o capitulo candidato e o PRIMEIRO, em ordem de
  * numero, que tem `end_page` numerico e ainda nao foi alcancado pela pagina
  * atual — pulando os que nao tem paginacao, em vez de travar neles.
+ *
+ * Achado da revisao da Tarefa 4: "pular" o capitulo sem paginacao nao basta.
+ * Com capitulos 1 (end 30), 2 (sem paginacao) e 3 (start 61, end 90), a
+ * pagina 50 esta depois do capitulo 1 mas ANTES do inicio do capitulo 3 — o
+ * leitor esta em algum ponto do capitulo 2, sem paginacao pra confirmar
+ * onde. Apontar "capitulo 3" seria o mesmo numero chutado que a funcao
+ * existe pra evitar. Por isso, quando o capitulo candidato tem `start_page`
+ * numerico, so vira meta se `currentPage` ja alcancou esse inicio.
  */
 export function currentChapterGoal(
-  chapters: Pick<Chapter, 'number' | 'end_page'>[],
+  chapters: Pick<Chapter, 'number' | 'start_page' | 'end_page'>[],
   currentPage: number,
 ): ChapterGoal | null {
   const ordenados = [...chapters].sort((a, b) => a.number - b.number);
@@ -29,6 +37,7 @@ export function currentChapterGoal(
     (c) => typeof c.end_page === 'number' && c.end_page > currentPage,
   );
   if (!atual || typeof atual.end_page !== 'number') return null;
+  if (typeof atual.start_page === 'number' && currentPage < atual.start_page) return null;
 
   return {
     chapterNumber: atual.number,

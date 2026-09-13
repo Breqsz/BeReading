@@ -47,8 +47,8 @@ describe('currentChapterGoal', () => {
 
   it('sem nenhum capitulo paginado, a meta some (nao inventa numero)', () => {
     const chapters = [
-      chapter({ number: 1, end_page: null as unknown as number, start_page: null as unknown as number }),
-      chapter({ number: 2, end_page: null as unknown as number, start_page: null as unknown as number }),
+      chapter({ number: 1, end_page: null, start_page: null }),
+      chapter({ number: 2, end_page: null, start_page: null }),
     ];
     expect(currentChapterGoal(chapters, 84)).toBeNull();
   });
@@ -62,18 +62,35 @@ describe('currentChapterGoal', () => {
     expect(currentChapterGoal([], 10)).toBeNull();
   });
 
-  it('capitulo sem paginacao no meio da lista nao quebra a busca pelo proximo paginado', () => {
+  // Achado RELEVANTE da revisao da Tarefa 4: sem `start_page`, a funcao
+  // "pulava" o capitulo sem paginacao e apontava o proximo paginado mesmo
+  // quando o leitor ainda nao tinha chegado nele. Com capitulos 1 (end 30),
+  // 2 (sem paginacao) e 3 (start 61, end 90), a pagina 50 esta DEPOIS do
+  // capitulo 1 mas ANTES do inicio do capitulo 3 — o leitor esta em algum
+  // ponto do capitulo 2, sem paginacao pra confirmar onde. Apontar "cap. 3"
+  // seria o mesmo tipo de numero chutado que a regra existe pra evitar.
+  it('capitulo sem paginacao antes da pagina atual: a meta some, nao aponta o capitulo seguinte', () => {
     const chapters = [
-      chapter({ number: 1, end_page: 30 }),
-      chapter({ number: 2, end_page: null as unknown as number }),
-      chapter({ number: 3, end_page: 90 }),
+      chapter({ number: 1, start_page: 1, end_page: 30 }),
+      chapter({ number: 2, start_page: null, end_page: null }),
+      chapter({ number: 3, start_page: 61, end_page: 90 }),
     ];
-    expect(currentChapterGoal(chapters, 50)).toEqual({
+    expect(currentChapterGoal(chapters, 50)).toBeNull();
+  });
+
+  it('capitulo seguinte paginado alcancado de verdade (pagina >= start_page): a meta aparece', () => {
+    const chapters = [
+      chapter({ number: 1, start_page: 1, end_page: 30 }),
+      chapter({ number: 2, start_page: null, end_page: null }),
+      chapter({ number: 3, start_page: 61, end_page: 90 }),
+    ];
+    expect(currentChapterGoal(chapters, 65)).toEqual({
       chapterNumber: 3,
       totalChapters: 3,
-      remainingPages: 40,
+      remainingPages: 25,
     });
   });
+
 });
 
 describe('daysSinceLastSession', () => {

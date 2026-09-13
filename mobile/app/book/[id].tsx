@@ -198,7 +198,15 @@ export default function BookDetailScreen() {
                       fontSize: 12,
                       color: colors.textMute,
                       marginTop: 2,
-                    }}>p. {chapter.start_page}–{chapter.end_page}</Text>
+                    }}>
+                      {/* BER-72: start_page/end_page podem ser nulos (livro sem
+                          paginacao por capitulo). Sem os dois, nao renderiza a
+                          faixa — texto quebrado ("p. –") e pior que nao mostrar
+                          nada. Tela legada, sem redesenho (F5/F6). */}
+                      {typeof chapter.start_page === 'number' && typeof chapter.end_page === 'number'
+                        ? `p. ${chapter.start_page}–${chapter.end_page}`
+                        : null}
+                    </Text>
                   </View>
                   <ChevronRight size={18} color={colors.textMute} />
                 </Pressable>

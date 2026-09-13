@@ -3,9 +3,7 @@
 // texto de apresentacao vem de src/assistant/persona.ts (ASSISTANT_INTRO),
 // a mesma constante que qualquer outra apresentacao da Orelha usaria.
 import { StyleSheet, View } from 'react-native';
-import { Text } from '../../ui/Text';
-import { Button } from '../../ui/Button';
-import { Glyph } from '../../assistant/Glyph';
+import { Text, Button, Glyph } from '../../ui';
 import { ASSISTANT_NAME, ASSISTANT_INTRO } from '../../assistant/persona';
 import { space } from '../../theme/tokens';
 

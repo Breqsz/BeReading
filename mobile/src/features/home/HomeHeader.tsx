@@ -52,9 +52,15 @@ export function HomeHeader({ name, level, onPressRing }: Props) {
         hitSlop={hitSlop}
         style={animado}
       >
-        <Ring progress={level.progress} size={RING_SIZE} accessibilityLabel={label}>
-          <Text variant="label">{level.level}</Text>
-        </Ring>
+        {/* O Ring tem seu proprio no acessivel (progressbar + o mesmo rotulo);
+            aninhado dentro de um botao com o mesmo texto, dois nos disputando
+            o foco do leitor de tela. O rotulo pertence ao botao; esconde o
+            Ring da arvore de acessibilidade, mesmo padrao do Glyph.tsx. */}
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Ring progress={level.progress} size={RING_SIZE} accessibilityLabel={label}>
+            <Text variant="label">{level.level}</Text>
+          </Ring>
+        </View>
       </AnimatedPressable>
     </View>
   );

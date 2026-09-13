@@ -18,7 +18,10 @@ describe('HomeHeader', () => {
     const { getByText } = render(
       <HomeHeader name="Guilherme" level={levelFor(1840)} onPressRing={jest.fn()} />,
     );
-    expect(getByText(String(levelFor(1840).level))).toBeTruthy();
+    // O Ring fica escondido da arvore de acessibilidade (accessibilityElementsHidden),
+    // entao a query precisa incluir elementos ocultos pra achar o texto dentro
+    // dele — mesma convencao de __tests__/ui/Glyph.test.tsx.
+    expect(getByText(String(levelFor(1840).level), { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('tocar no anel navega (chama onPressRing), com role e label de botao', () => {
@@ -43,5 +46,17 @@ describe('HomeHeader', () => {
     const slop = botao.props.hitSlop ?? { top: 0, bottom: 0, left: 0, right: 0 };
     expect(RING_SIZE + slop.top + slop.bottom).toBeGreaterThanOrEqual(MIN_TOUCH);
     expect(RING_SIZE + slop.left + slop.right).toBeGreaterThanOrEqual(MIN_TOUCH);
+  });
+
+  // Achado MENOR da revisao da Tarefa 4: o botao e o Ring dentro dele
+  // aninhavam dois nos acessiveis com o mesmo texto. So deve sobrar um
+  // "button" anunciavel; o Ring escondido nao aparece como progressbar
+  // separado para o leitor de tela.
+  it('so ha um no acessivel (o botao); o Ring interno nao concorre pelo foco', () => {
+    const { getAllByRole, queryByRole } = render(
+      <HomeHeader name="Guilherme" level={levelFor(1840)} onPressRing={jest.fn()} />,
+    );
+    expect(getAllByRole('button').length).toBe(1);
+    expect(queryByRole('progressbar')).toBeNull();
   });
 });

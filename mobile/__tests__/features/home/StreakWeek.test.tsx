@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { StreakWeek } from '../../../src/features/home/StreakWeek';
 import type { WeekDay } from '../../../src/game/streak';
 
@@ -27,7 +28,25 @@ describe('StreakWeek', () => {
 
   it('marca o dia de hoje de forma distinguivel dos outros nao lidos', () => {
     const { getByTestId } = render(<StreakWeek days={dias} streakText="x" />);
-    // O dia de hoje (indice 4, sexta) nao foi lido mas e' hoje: testID proprio.
     expect(getByTestId('week-day-today')).toBeTruthy();
+  });
+
+  // Achado RELEVANTE da revisao da Tarefa 4: o teste anterior so checava o
+  // testID (que o proprio `isToday` aplica incondicionalmente, sem relacao
+  // com estilo nenhum) — apagar a borda tracejada que de fato distingue o
+  // dia de hoje deixava o teste verde. Este afirma o ESTILO renderizado:
+  // compara o marcador de hoje (nao lido) com o de um dia comum tambem nao
+  // lido, e exige que difiram no que importa (cor de fundo e de borda).
+  it('o marcador de hoje (nao lido) tem estilo diferente de um dia comum nao lido', () => {
+    const { getByTestId } = render(<StreakWeek days={dias} streakText="x" />);
+
+    // '2026-09-11' e' hoje e nao foi lido; '2026-09-12' e' um dia comum,
+    // tambem nao lido — o par certo pra provar que a diferenca e' "hoje",
+    // nao "lido".
+    const hoje = StyleSheet.flatten(getByTestId('week-marker-2026-09-11').props.style);
+    const comum = StyleSheet.flatten(getByTestId('week-marker-2026-09-12').props.style);
+
+    expect(hoje.borderColor).not.toBe(comum.borderColor);
+    expect(hoje.backgroundColor).not.toBe(comum.backgroundColor);
   });
 });

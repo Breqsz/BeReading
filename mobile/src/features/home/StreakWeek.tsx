@@ -24,6 +24,7 @@ export function StreakWeek({ days, streakText }: Props) {
         {days.map((dia) => (
           <View key={dia.date} style={styles.day} testID={dia.isToday ? 'week-day-today' : undefined}>
             <View
+              testID={`week-marker-${dia.date}`}
               style={[
                 styles.marker,
                 dia.read ? styles.markerRead : null,
@@ -39,7 +40,7 @@ export function StreakWeek({ days, streakText }: Props) {
           </View>
         ))}
       </View>
-      <Text variant="callout" tone="secondary" style={styles.streak}>{streakText}</Text>
+      <Text variant="callout" tone="secondary">{streakText}</Text>
     </View>
   );
 }
@@ -60,5 +61,4 @@ const styles = StyleSheet.create({
   },
   markerRead: { backgroundColor: color.accent, borderColor: color.accent },
   markerToday: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: color.accent },
-  streak: {},
 });

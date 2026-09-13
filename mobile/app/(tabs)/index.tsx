@@ -26,6 +26,20 @@ import type { Book, Chapter, StudentBook } from '../../src/types/database';
 
 type Entry = StudentBook & { book: Book };
 
+/**
+ * O quiz pendente e a contagem de perguntas so fazem sentido juntos: um
+ * capitulo sem contagem confiavel nao e "quiz pendente com zero perguntas",
+ * e' "ainda nao sei". Por isso um estado so, atribuido de uma vez so depois
+ * das duas consultas voltarem — nunca dois `useState` que a tela possa ler
+ * em momentos diferentes (achado critico da revisao da Tarefa 4: um deles
+ * podia zerar sem o outro, e a tela escrevia "deixou 0 perguntas pra tras").
+ */
+interface PendingQuiz {
+  chapterId: string;
+  chapterNumber: number;
+  questionCount: number;
+}
+
 const SEM_STREAK = { current_streak: 0, last_read_date: null as string | null };
 
 export default function HomeScreen() {
@@ -39,8 +53,7 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [books, setBooks] = useState<Entry[] | null>(null);
   const [chapters, setChapters] = useState<Chapter[] | null>(null);
-  const [pendingChapters, setPendingChapters] = useState<Chapter[]>([]);
-  const [pendingQuestionCount, setPendingQuestionCount] = useState(0);
+  const [pendingQuiz, setPendingQuiz] = useState<PendingQuiz | null>(null);
 
   const load = useCallback(async (userId: string) => {
     setError(null);
@@ -67,22 +80,23 @@ export default function HomeScreen() {
       }
 
       // BER-54: falhar aqui nao derruba a tela, so o card do assistente some.
+      // As duas consultas (capitulos pendentes e contagem de perguntas) so
+      // viram estado JUNTAS, no fim: qualquer falha no meio devolve null, o
+      // card some, e nao um numero pela metade.
       try {
         const pendentes = await loadPendingQuizzes(userId, entries);
-        setPendingChapters(pendentes);
-        if (pendentes.length > 0) {
-          try {
-            const perguntas = await getQuestionsForChapter(pendentes[0].id);
-            setPendingQuestionCount(perguntas.length);
-          } catch {
-            setPendingQuestionCount(0);
-          }
+        if (pendentes.length === 0) {
+          setPendingQuiz(null);
         } else {
-          setPendingQuestionCount(0);
+          const perguntas = await getQuestionsForChapter(pendentes[0].id);
+          setPendingQuiz({
+            chapterId: pendentes[0].id,
+            chapterNumber: pendentes[0].number,
+            questionCount: perguntas.length,
+          });
         }
       } catch {
-        setPendingChapters([]);
-        setPendingQuestionCount(0);
+        setPendingQuiz(null);
       }
     } catch {
       // Erro (banner): o que ja carregou (books, chapters, progressStore)
@@ -119,29 +133,54 @@ export default function HomeScreen() {
     );
   }
 
-  const lendo = books?.filter((e) => e.status === 'reading') ?? [];
-  const atual = books ? (lendo[0] ?? books[0] ?? null) : null;
-  const outros = atual ? lendo.filter((e) => e.book.id !== atual.book.id) : [];
+  const banner = error ? <Banner tone="danger" message={error} onRetry={onRefresh} /> : null;
+  const header = (
+    <HomeHeader
+      name={profile.display_name}
+      level={level}
+      onPressRing={() => router.push('/(tabs)/perfil')}
+    />
+  );
 
-  const meta = atual && chapters ? currentChapterGoal(chapters, atual.current_page) : null;
+  // Sem carga bem-sucedida nenhuma ainda (so acontece com erro na primeira
+  // tentativa: o banner acima ja explica). Nao ha "atual" pra derivar nada.
+  if (books === null) {
+    return (
+      <Screen refreshing={refreshing} onRefresh={onRefresh} contentStyle={styles.content}>
+        {banner}
+        {header}
+      </Screen>
+    );
+  }
+
+  if (books.length === 0) {
+    return (
+      <Screen refreshing={refreshing} onRefresh={onRefresh} contentStyle={styles.content}>
+        {banner}
+        {header}
+        <HomeEmptyState onExplore={() => router.push('/(tabs)/catalogo')} />
+      </Screen>
+    );
+  }
+
+  // Daqui pra baixo, books.length > 0: sempre ha um livro atual, sem
+  // precisar tratar `atual` como possivelmente nulo de novo (a checagem
+  // condicional redundante era um ramo morto apontado na revisao).
+  const lendo = books.filter((e) => e.status === 'reading');
+  const atual: Entry = lendo[0] ?? books[0];
+  const outros = lendo.filter((e) => e.book.id !== atual.book.id);
+
+  const meta = chapters ? currentChapterGoal(chapters, atual.current_page) : null;
 
   const streakEfetiva = effectiveStreak(streak ?? SEM_STREAK);
   const leuHoje = readSessionToday(sessions);
 
-  const pendingQuiz = pendingChapters.length > 0
-    ? {
-      chapterId: pendingChapters[0].id,
-      chapterNumber: pendingChapters[0].number,
-      questionCount: pendingQuestionCount,
-    }
-    : null;
-
-  const motivo = atual ? chooseAssistantReason({
+  const motivo = chooseAssistantReason({
     pendingQuiz,
     streak: streakEfetiva,
     readToday: leuHoje,
     staleDays: daysSinceLastSession(sessions, atual.book.id),
-  }) : null;
+  });
 
   let assistantText: string | null = null;
   let assistantCta: { label: string; onPress: () => void } | null = null;
@@ -156,54 +195,38 @@ export default function HomeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh} contentStyle={styles.content}>
-      {error ? <Banner tone="danger" message={error} onRetry={onRefresh} /> : null}
+      {banner}
+      {header}
+      <StreakWeek days={weekDays(sessions)} streakText={streakLine(streakEfetiva)} />
 
-      <HomeHeader
-        name={profile.display_name}
-        level={level}
-        onPressRing={() => router.push('/(tabs)/perfil')}
+      <CurrentBookHero
+        book={atual.book}
+        currentPage={atual.current_page}
+        goal={meta}
+        onPress={() => router.push(`/book/${atual.book.id}`)}
       />
+      <Button icon={BookOpen} onPress={() => router.push('/register-reading')}>
+        Registrar leitura
+      </Button>
 
-      {books === null ? null : books.length === 0 ? (
-        <HomeEmptyState onExplore={() => router.push('/(tabs)/catalogo')} />
-      ) : (
-        <>
-          <StreakWeek days={weekDays(sessions)} streakText={streakLine(streakEfetiva)} />
+      {assistantText ? (
+        <AssistantCard
+          text={assistantText}
+          ctaLabel={assistantCta?.label}
+          onPressCta={assistantCta?.onPress}
+        />
+      ) : null}
 
-          {atual ? (
-            <>
-              <CurrentBookHero
-                book={atual.book}
-                currentPage={atual.current_page}
-                goal={meta}
-                onPress={() => router.push(`/book/${atual.book.id}`)}
-              />
-              <Button icon={BookOpen} onPress={() => router.push('/register-reading')}>
-                Registrar leitura
-              </Button>
-            </>
-          ) : null}
+      {outros.length > 0 ? (
+        <AlsoReadingRow
+          books={outros.map((e) => ({
+            id: e.book.id, title: e.book.title, author: e.book.author, cover_url: e.book.cover_url,
+          }))}
+          onPressBook={(id) => router.push(`/book/${id}`)}
+        />
+      ) : null}
 
-          {assistantText ? (
-            <AssistantCard
-              text={assistantText}
-              ctaLabel={assistantCta?.label}
-              onPressCta={assistantCta?.onPress}
-            />
-          ) : null}
-
-          {outros.length > 0 ? (
-            <AlsoReadingRow
-              books={outros.map((e) => ({
-                id: e.book.id, title: e.book.title, author: e.book.author, cover_url: e.book.cover_url,
-              }))}
-              onPressBook={(id) => router.push(`/book/${id}`)}
-            />
-          ) : null}
-
-          <LevelFooter level={level} xp={xp} />
-        </>
-      )}
+      <LevelFooter level={level} xp={xp} />
     </Screen>
   );
 }

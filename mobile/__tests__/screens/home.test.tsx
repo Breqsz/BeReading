@@ -26,6 +26,13 @@ jest.mock('expo-router', () => {
     },
   };
 });
+// Divida de cobertura conhecida (MENOR da revisao da Tarefa 4): com deps
+// fixas, este mock nunca re-executa dentro de uma MESMA instancia montada —
+// "voltar pra aba sem desmontar" nao tem teste direto. A suite "uma nova
+// visita a aba busca de novo (remount)", mais abaixo, cobre o equivalente
+// disponivel (nova montagem = novo ciclo de foco), mas nao o caso exato de
+// foco->blur->foco na mesma instancia. Verificado a parte que isso nao gera
+// loop em producao: ver task-4-fix-report.md.
 
 let mockProfile: any = {
   user_id: 'u1', display_name: 'Guilherme', classroom_id: null, created_at: '2026-01-01T00:00:00.000Z',
@@ -215,7 +222,7 @@ describe('Hoje: a meta de capitulo (BER-72)', () => {
     mGetBookWithChapters.mockResolvedValue({
       ...b,
       chapters: [
-        chapter({ number: 1, end_page: null as unknown as number, start_page: null as unknown as number }),
+        chapter({ number: 1, end_page: null, start_page: null }),
       ],
     });
     semAssunto();
@@ -272,6 +279,26 @@ describe('Hoje: card do assistente', () => {
 
     fireEvent.press(getByText('Responder agora'));
     expect(mockPush).toHaveBeenCalledWith('/quiz/ch3');
+  });
+
+  // CRITICO da revisao da Tarefa 4: pendingChapters e pendingQuestionCount
+  // eram dois estados lidos como um fato so. Falha na contagem zerava o
+  // numero sem limpar o capitulo, e a tela escrevia "deixou 0 perguntas pra
+  // tras" com CTA do lado - zero de fallback com cara de contagem real.
+  it('falha ao contar as perguntas do quiz pendente: o card some, nao anuncia zero', async () => {
+    const b = book();
+    mGetStudentBooks.mockResolvedValue([entry({ current_page: 84 }, b)]);
+    mLoadPendingQuizzes.mockResolvedValue([chapter({ id: 'ch3', number: 3, end_page: 84 })]);
+    mGetQuestionsForChapter.mockRejectedValue(new Error('rede caiu'));
+    mGetStreak.mockResolvedValue(streak({ last_read_date: '2026-09-13' }));
+    mGetReadingSessions.mockResolvedValue([sessao({ read_at: '2026-09-13T12:00:00.000Z' })]);
+
+    const { findByText, queryByText } = render(<HomeScreen />);
+    await findByText('Lendo agora');
+
+    expect(queryByText('Orelha')).toBeNull();
+    expect(queryByText(/perguntas pra trás/)).toBeNull();
+    expect(queryByText(/0 pergunta/)).toBeNull();
   });
 
   it('some quando nao ha quiz pendente, sequencia em risco nem livro parado', async () => {
@@ -338,5 +365,39 @@ describe('Hoje: fileira "Também lendo"', () => {
     const { findByText, queryByText } = render(<HomeScreen />);
     await findByText('Lendo agora');
     expect(queryByText('Também lendo')).toBeNull();
+  });
+});
+
+// MENOR da revisao da Tarefa 4: o mock de useFocusEffect (deps fixas, ver
+// comentario no topo do arquivo) nunca re-executa dentro de uma MESMA
+// instancia montada, entao nenhum teste cobria "voltar pra aba busca de
+// novo". Uma nova montagem e' o equivalente disponivel dentro dessa
+// limitacao do mock: cada `render()` roda seu proprio efeito de foco uma
+// vez, com o profile e os mocks vigentes NAQUELE momento — o que prova que a
+// busca nao fica presa a dados de uma instancia anterior.
+describe('Hoje: uma nova visita a aba busca de novo (remount)', () => {
+  it('a segunda montagem busca com o profile e os dados vigentes, nao com os da primeira', async () => {
+    const b1 = book({ id: 'b1', title: 'Livro Um' });
+    mGetStudentBooks.mockResolvedValueOnce([entry({ current_page: 10 }, b1)]);
+    semAssunto();
+
+    // O titulo aparece duas vezes na tela (a capa tipografica gerada e o
+    // cabecalho do hero, ver CurrentBookHero.test.tsx): a busca por texto
+    // simples daria "multiplos elementos". O accessibilityLabel do hero e'
+    // unico e ja inclui o titulo, entao serve de marcador sem ambiguidade.
+    const primeira = render(<HomeScreen />);
+    await primeira.findByLabelText(/Abrir Livro Um,/);
+    expect(mGetStudentBooks).toHaveBeenNthCalledWith(1, 'u1');
+    primeira.unmount();
+
+    // Simula voltar pra aba depois de uma troca de conta: profile novo,
+    // livro novo.
+    mockProfile = { ...mockProfile, user_id: 'u2' };
+    const b2 = book({ id: 'b2', title: 'Livro Dois' });
+    mGetStudentBooks.mockResolvedValueOnce([entry({ current_page: 20 }, b2)]);
+
+    const segunda = render(<HomeScreen />);
+    await segunda.findByLabelText(/Abrir Livro Dois,/);
+    expect(mGetStudentBooks).toHaveBeenNthCalledWith(2, 'u2');
   });
 });

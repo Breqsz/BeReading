@@ -122,8 +122,9 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
 - **Chip**: seleção de baixo compromisso (filtro, atalho de página). `radius.pill`. Estados:
   default (fundo transparente, borda `color.line2`); pressed; selected (invertido: fundo
   `color.text`, texto escuro — tinta clara com texto escuro, não `accentSoft`); disabled.
-- **Tag**: rótulo **estático**, o par informativo do Chip. Quatro usos: "+X XP" e "N dias
-  seguidos" na conquista, "nota · +XP" no quiz, gênero e páginas no detalhe do livro. `radius.tag`.
+- **Tag**: rótulo **estático**, o par informativo do Chip. Usos: "+X XP" e "N dias seguidos" na
+  conquista, "nota · +XP" no quiz, gênero e páginas no detalhe do livro, "Lendo agora" no hero da
+  Hoje (F4, no lugar do rótulo em maiúsculas espaçadas que a tela antiga usava). `radius.tag`.
   Não tem estado de interação porque **não é tocável**, e essa é a razão de existir dele: o Chip
   exige `onPress` e se anuncia como botão, então usá-lo só para mostrar informação põe um botão
   falso na árvore de acessibilidade. Cada tom é um par fundo mais tinta, dos que já existem
@@ -162,6 +163,12 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
 - **ListRow**: linha de lista com divisória (`color.line`), no lugar do card do sistema legado.
   Estados: default; pressed (`color.surface3`) quando a linha é tocável; disabled. Sem sombra,
   sem borda lateral de destaque (anti-pattern, seção 9).
+- **Card** (F4): superfície de cartão isolado, `elevation.surface` (`color.surface1` + borda
+  `color.line`, `radius.card`, `space.lg` de padding interno). Estados: default; pressed
+  (`motion.press`) quando tocável (`onPress` opcional; com ele, `accessibilityLabel` é
+  obrigatório). Sem sombra: hierarquia vem de espaço e divisória, mesma regra do `ListRow`
+  (anti-pattern, seção 9). Nasceu na Hoje (bolha do assistente), mas é vocabulário genérico —
+  qualquer tela pode compor conteúdo dentro dele.
 - **Toast**: confirmação transitória (registro salvo, conquista simples), via `ToastProvider`, no
   lugar de `Alert.alert`. Estados: entering (`motion.enter`); visible; exiting (`motion.exit`, ⅔
   da entrada). Não bloqueia interação por trás.

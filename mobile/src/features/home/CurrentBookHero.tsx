@@ -35,7 +35,7 @@ export function CurrentBookHero({ book, currentPage, goal, onPress }: Props) {
         <Text variant="heading" numberOfLines={2} style={styles.title}>{book.title}</Text>
         <Text variant="caption" tone="secondary" numberOfLines={1}>{book.author}</Text>
         {goal ? (
-          <Text variant="caption" tone="tertiary" style={styles.goal}>
+          <Text variant="caption" tone="tertiary">
             {`cap. ${goal.chapterNumber} de ${goal.totalChapters} · ${
               goal.remainingPages === 1 ? 'falta' : 'faltam'
             } ${goal.remainingPages} pág. pra fechar`}
@@ -58,6 +58,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: space.md },
   info: { flex: 1, minWidth: 0, gap: space.xs, justifyContent: 'center' },
   title: { marginTop: space.xs },
-  goal: {},
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.xs },
 });

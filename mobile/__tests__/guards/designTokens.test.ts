@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -8,13 +8,31 @@ import { join } from 'path';
 const RAIZ = join(__dirname, '..', '..');
 
 /**
- * Pastas onde o sistema novo ja vale. src/components e app/(tabs) entram conforme
- * migram. src/features ainda nao existe: entra na F4, quando os blocos de tela
- * forem criados. Ate la ela fica FORA desta lista de proposito — vigiar pasta
- * inexistente e a mesma ilusao de seguranca que o teste de "varre pelo menos um
- * arquivo" tinha quando a checagem era agregada (ver rodada de correcao 1).
+ * Pastas onde o sistema novo ja vale, e que hoje tem pelo menos um arquivo
+ * real (por isso ficam fora da checagem especial de pasta vazia, logo
+ * abaixo). src/components e app/(tabs) entram conforme migram.
  */
-const VIGIADAS = ['src/ui', 'src/assistant', 'src/game'];
+const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app'];
+
+/**
+ * F4 (Tarefa 1): fecha o buraco que a revisao da F2 apontou. `app/` e
+ * `src/features` sao exatamente onde as tarefas seguintes desta fase vao
+ * escrever tela nova — sem entrar em VIGIADAS agora, tela nova nasceria
+ * descoberta (cor literal, fontSize solto, Alert.alert) sem nenhum teste
+ * acusar.
+ *
+ * `src/features` ainda nao existe (nasce na Tarefa 2, quando o primeiro
+ * bloco de tela for criado). Ela entra aqui mesmo assim, vazia: a varredura
+ * (`arquivos`, abaixo) tolera pasta ausente ou vazia e so vai encontrar
+ * arquivo pra valer quando a Tarefa 2 criar o primeiro — nascendo coberta
+ * desde o primeiro arquivo, sem depender de alguem lembrar de atualizar esta
+ * guarda depois. A checagem "pasta tem arquivo pra varrer" (que existe pra
+ * acusar pasta renomeada ou movida) nao faz sentido pra uma pasta que E pra
+ * estar vazia agora: por isso ela roda so em VIGIADAS_COM_CONTEUDO, e
+ * src/features ganha teste proprio mais abaixo, que afirma o estado atual em
+ * vez de so pular a checagem (ver esse teste pra o raciocinio completo).
+ */
+const VIGIADAS = [...VIGIADAS_COM_CONTEUDO, 'src/features'];
 
 /**
  * Pastas do sistema "Luminous Library" anterior, que ainda nao migraram (saem
@@ -35,6 +53,41 @@ const EXCECOES_COR = new Set([
   // Sobreposicao sobre a cor da capa (lombada, filete, sombra): nao e cor de
   // marca, e alpha sobre um fundo que muda por livro.
   'src/ui/Cover.tsx',
+]);
+
+/**
+ * As 13 telas do "Luminous Library" anterior que moram em `app/` (a
+ * contagem exclui os _layout.tsx de rota, que sao config de navegacao, nao
+ * tela) ainda nao migraram pro design novo — migram uma a uma, ate a F6.
+ * Cada entrada aqui e divida DECLARADA: o arquivo inteiro fica de fora das
+ * tres guardas deste diretorio ate ser reescrito, porque a reescrita troca a
+ * tela inteira (cor, tipografia, feedback juntos), nao um literal de cada
+ * vez — diferente de EXCECOES_COR acima, que e uma excecao pontual e
+ * permanente (alpha sobre capa), esta e temporal e so encolhe.
+ *
+ * app/chapter-complete.tsx e app/reading-success.tsx (F3) NAO entram: sao
+ * novos e limpos, e por isso respondem pela guarda como qualquer arquivo de
+ * VIGIADAS. app/_layout.tsx, app/(auth)/_layout.tsx e app/(tabs)/_layout.tsx
+ * (tambem tocados na F3) tambem ficam de fora: nenhum tinha cor, fontSize ou
+ * Alert.alert literal de verdade (o unico achado bruto era um travessao
+ * dentro de um comentario JSX de app/(tabs)/_layout.tsx, corrigido no
+ * arquivo em vez de virar excecao).
+ *
+ * Lista compartilhada pelas tres guardas deste diretorio. Ela so encolhe: ao
+ * migrar uma tela, tire a entrada daqui, nao adicione.
+ */
+const EXCECAO_APP_LEGADO = new Set([
+  'app/(auth)/confirm-email.tsx',
+  'app/(auth)/login.tsx',
+  'app/(auth)/signup.tsx',
+  'app/(tabs)/catalogo.tsx',
+  'app/(tabs)/index.tsx',
+  'app/(tabs)/livros.tsx',
+  'app/(tabs)/perfil.tsx',
+  'app/book/[id].tsx',
+  'app/quiz/[chapterId].tsx',
+  'app/quiz/summary.tsx',
+  'app/register-reading.tsx',
 ]);
 
 function arquivos(dir: string): string[] {
@@ -78,12 +131,22 @@ describe('guarda: cor', () => {
   // src/ui podia sumir ou ser renomeada que src/assistant e src/game ainda
   // manteriam o numero positivo, nenhum it.each rodaria pra src/ui e a guarda
   // passaria protegendo nada. Isso acusa pasta renomeada ou movida.
-  it.each(VIGIADAS)('a pasta %s tem arquivo para varrer', (dir) => {
+  it.each(VIGIADAS_COM_CONTEUDO)('a pasta %s tem arquivo para varrer', (dir) => {
     expect(arquivos(dir).length).toBeGreaterThan(0);
+  });
+
+  // src/features nao entra no it.each acima porque HOJE ela deve estar vazia
+  // (ver comentario de VIGIADAS). Esta afirma o estado atual em vez de so
+  // pular a checagem: no dia que a Tarefa 2 criar o primeiro arquivo, este
+  // teste comeca a falhar sozinho e obriga quem migrar a trocar para
+  // toBeGreaterThan(0) — nao a apagar a linha silenciosamente.
+  it('src/features ainda esta vazia nesta tarefa (Tarefa 2 cria o primeiro arquivo)', () => {
+    expect(arquivos('src/features').length).toBe(0);
   });
 
   it.each(TODOS)('%s nao tem cor literal fora dos tokens', (rel) => {
     if (EXCECOES_COR.has(rel)) return;
+    if (EXCECAO_APP_LEGADO.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     const achados = codigo.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [];
     expect(achados).toEqual([]);
@@ -96,8 +159,10 @@ describe('guarda: tipografia', () => {
   // isencao nao protegia nada e, pior, escondia justamente o arquivo que existe
   // pra acabar com os tamanhos soltos do app antigo. Se um dia precisar mesmo
   // de literal, a guarda acusa e a excecao volta nominal, com motivo escrito
-  // (mesma regra do EXCECOES_COR).
+  // (mesma regra do EXCECOES_COR). EXCECAO_APP_LEGADO e diferente: e divida
+  // de migracao, nao decisao de design, e por isso vale aqui tambem.
   it.each(TODOS)('%s nao tem fontSize nem fontFamily literal', (rel) => {
+    if (EXCECAO_APP_LEGADO.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(codigo).not.toMatch(/fontSize:\s*\d/);
     expect(codigo).not.toMatch(/fontFamily:\s*['"]/);
@@ -106,8 +171,22 @@ describe('guarda: tipografia', () => {
 
 describe('guarda: feedback', () => {
   it.each(TODOS)('%s nao usa Alert.alert', (rel) => {
+    if (EXCECAO_APP_LEGADO.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(codigo).not.toMatch(/Alert\.alert/);
+  });
+});
+
+/**
+ * A lista de excecao precisa provar que esta viva. Excecao apontando pra
+ * arquivo apagado e lixo que finge cobertura: a tela "migrou" (ou sumiu) e a
+ * entrada continuou aqui, escondendo que ninguem tirou a divida da lista.
+ * Isso apodrece ao longo de seis fases se ninguem checar. Este teste falha
+ * assim que um arquivo listado deixar de existir.
+ */
+describe('guarda: excecao de app/ legado nao aponta pra arquivo fantasma', () => {
+  it.each([...EXCECAO_APP_LEGADO])('excecao %s ainda existe', (rel) => {
+    expect(existsSync(join(RAIZ, rel))).toBe(true);
   });
 });
 

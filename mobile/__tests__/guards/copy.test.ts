@@ -1,23 +1,53 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 const RAIZ = join(__dirname, '..', '..');
 
 /**
- * src/features ainda nao existe: entra na F4, quando os blocos de tela forem
- * criados. Fica fora da lista de proposito ate la — ver designTokens.test.ts
- * pro raciocinio completo (rodada de correcao 1).
+ * Pastas onde o sistema novo ja vale, e que hoje tem pelo menos um arquivo
+ * real. Ver designTokens.test.ts pro raciocinio completo de por que
+ * src/features fica fora desta lista especifica e entra so em VIGIADAS.
  *
  * src/game entrou nesta rodada: LEVEL_TITLES em src/game/xp.ts ("Rato de
  * biblioteca" etc.) e copy de verdade, exibida na tela, e nao tinha guarda
  * nenhuma de emoji/travessao ate agora — a checagem inversa no fim do
  * arquivo foi o que acusou o buraco.
  */
-const VIGIADAS = ['src/ui', 'src/assistant', 'src/game'];
+const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app'];
+
+/**
+ * F4 (Tarefa 1): `app/` e `src/features` sao onde as tarefas seguintes desta
+ * fase escrevem tela nova. src/features ainda nao existe (nasce na Tarefa 2)
+ * e entra aqui mesmo vazia, pelo mesmo motivo de designTokens.test.ts: nasce
+ * coberta desde o primeiro arquivo, sem depender de lembranca futura.
+ */
+const VIGIADAS = [...VIGIADAS_COM_CONTEUDO, 'src/features'];
 
 /** Pastas do sistema "Luminous Library" anterior, que ainda nao migraram
  * (saem na F6). Lista compartilhada pelas tres guardas deste diretorio. */
 const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types', 'src/utils', 'src/theme'];
+
+/**
+ * As telas antigas de `app/` que ainda nao migraram. Mesma lista e mesmo
+ * raciocinio de designTokens.test.ts (arquivo inteiro fica de fora ate ser
+ * reescrito, porque a reescrita troca a tela inteira). Repetida aqui porque
+ * cada guarda deste diretorio e standalone — ver aquele arquivo pro
+ * raciocinio completo de quem entra e quem fica de fora (chapter-complete,
+ * reading-success e os tres _layout.tsx nao entram).
+ */
+const EXCECAO_APP_LEGADO = new Set([
+  'app/(auth)/confirm-email.tsx',
+  'app/(auth)/login.tsx',
+  'app/(auth)/signup.tsx',
+  'app/(tabs)/catalogo.tsx',
+  'app/(tabs)/index.tsx',
+  'app/(tabs)/livros.tsx',
+  'app/(tabs)/perfil.tsx',
+  'app/book/[id].tsx',
+  'app/quiz/[chapterId].tsx',
+  'app/quiz/summary.tsx',
+  'app/register-reading.tsx',
+]);
 
 /**
  * Emoji e travessao: proibidos em texto de interface (DESIGN.md, secao Voice).
@@ -59,18 +89,38 @@ function linhasDeCodigo(conteudo: string): string[] {
 describe('guarda: copy', () => {
   // Checagem por pasta, nao agregada: ver designTokens.test.ts (rodada de
   // correcao 1) pro raciocinio completo de por que o total sozinho nao basta.
-  it.each(VIGIADAS)('a pasta %s tem arquivo para varrer', (dir) => {
+  it.each(VIGIADAS_COM_CONTEUDO)('a pasta %s tem arquivo para varrer', (dir) => {
     expect(arquivos(dir).length).toBeGreaterThan(0);
   });
 
+  // src/features fica de fora do it.each acima de proposito: ver
+  // designTokens.test.ts. Este teste afirma o vazio atual em vez de so pular
+  // a checagem, e vira tripwire quando a Tarefa 2 criar o primeiro arquivo.
+  it('src/features ainda esta vazia nesta tarefa (Tarefa 2 cria o primeiro arquivo)', () => {
+    expect(arquivos('src/features').length).toBe(0);
+  });
+
   it.each(TODOS)('%s nao tem emoji', (rel) => {
+    if (EXCECAO_APP_LEGADO.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(EMOJI.test(codigo)).toBe(false);
   });
 
   it.each(TODOS)('%s nao tem travessao em codigo', (rel) => {
+    if (EXCECAO_APP_LEGADO.has(rel)) return;
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     expect(TRAVESSAO.test(codigo)).toBe(false);
+  });
+});
+
+/**
+ * A lista de excecao precisa provar que esta viva: falha assim que um
+ * arquivo listado deixar de existir, em vez de continuar "protegendo" uma
+ * tela que ja migrou ou sumiu (lixo que finge cobertura).
+ */
+describe('guarda: excecao de app/ legado nao aponta pra arquivo fantasma', () => {
+  it.each([...EXCECAO_APP_LEGADO])('excecao %s ainda existe', (rel) => {
+    expect(existsSync(join(RAIZ, rel))).toBe(true);
   });
 });
 

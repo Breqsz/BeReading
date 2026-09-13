@@ -1,30 +1,62 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 const RAIZ = join(__dirname, '..', '..');
 
 /**
- * src/features ainda nao existe: entra na F4, quando os blocos de tela forem
- * criados. Fica fora da lista de proposito ate la — ver designTokens.test.ts
- * pro raciocinio completo (rodada de correcao 1).
+ * Pastas .tsx que ja tem arquivo real hoje (accessibilityRole/Label so faz
+ * sentido em JSX). app/ entra nesta rodada (F4, Tarefa 1): e onde a fase
+ * escreve tela nova, e o app antigo tinha zero accessibilityLabel. Ver
+ * designTokens.test.ts pro raciocinio completo de por que src/features fica
+ * fora desta lista especifica (so em VIGIADAS, abaixo).
  */
-const VIGIADAS = ['src/ui'];
+const VIGIADAS_COM_CONTEUDO = ['src/ui', 'app'];
 
 /**
- * As pastas que o redesign (F2) entregou, mesmo as que esta guarda em
+ * src/features ainda nao existe (nasce na Tarefa 2). Entra em VIGIADAS
+ * vazia mesmo assim, pelo mesmo motivo das outras duas guardas: nasce
+ * coberta desde o primeiro arquivo .tsx, sem depender de lembranca futura.
+ */
+const VIGIADAS = [...VIGIADAS_COM_CONTEUDO, 'src/features'];
+
+/**
+ * As pastas que o redesign (F2-F4) entregou, mesmo as que esta guarda em
  * particular nao varre: accessibilityRole/Label so faz sentido em JSX
  * (.tsx), e src/assistant e src/game sao .ts puro, sem Pressable nenhum —
- * por isso VIGIADAS acima fica so com src/ui. Mas para a checagem inversa no
- * fim do arquivo (pasta nova nasce coberta ou acusa), as tres precisam
+ * por isso VIGIADAS acima fica sem eles. Mas para a checagem inversa no fim
+ * do arquivo (pasta nova nasce coberta ou acusa), as pastas precisam
  * aparecer como "com dono conhecido", senao a checagem acusaria pastas que
  * ja existem e ja sao cobertas pelas outras duas guardas (copy,
  * designTokens) por engano.
  */
-const PASTAS_DO_REDESIGN = ['src/ui', 'src/assistant', 'src/game'];
+const PASTAS_DO_REDESIGN = ['src/ui', 'src/assistant', 'src/game', 'src/features'];
 
 /** Pastas do sistema "Luminous Library" anterior, que ainda nao migraram
  * (saem na F6). Lista compartilhada pelas tres guardas deste diretorio. */
 const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types', 'src/utils', 'src/theme'];
+
+/**
+ * As telas antigas de `app/` que ainda nao migraram. Mesma lista e mesmo
+ * raciocinio de designTokens.test.ts. Repetida aqui porque cada guarda deste
+ * diretorio e standalone. Nem toda entrada tem Pressable sem label (por
+ * exemplo app/(auth)/login.tsx nao usa Pressable) — mas a excecao e sobre o
+ * ARQUIVO como divida de migracao inteira, nao sobre a violacao pontual, e
+ * pra quem nao tem Pressable a linha e inofensiva (o teste so roda de
+ * verdade quando acha <Pressable ou AnimatedPressable).
+ */
+const EXCECAO_APP_LEGADO = new Set([
+  'app/(auth)/confirm-email.tsx',
+  'app/(auth)/login.tsx',
+  'app/(auth)/signup.tsx',
+  'app/(tabs)/catalogo.tsx',
+  'app/(tabs)/index.tsx',
+  'app/(tabs)/livros.tsx',
+  'app/(tabs)/perfil.tsx',
+  'app/book/[id].tsx',
+  'app/quiz/[chapterId].tsx',
+  'app/quiz/summary.tsx',
+  'app/register-reading.tsx',
+]);
 
 function arquivos(dir: string): string[] {
   const abs = join(RAIZ, dir);
@@ -47,15 +79,34 @@ const TODOS = VIGIADAS.flatMap(arquivos);
 describe('guarda: acessibilidade', () => {
   // Checagem por pasta, nao agregada: ver designTokens.test.ts (rodada de
   // correcao 1) pro raciocinio completo de por que o total sozinho nao basta.
-  it.each(VIGIADAS)('a pasta %s tem arquivo para varrer', (dir) => {
+  it.each(VIGIADAS_COM_CONTEUDO)('a pasta %s tem arquivo para varrer', (dir) => {
     expect(arquivos(dir).length).toBeGreaterThan(0);
   });
 
+  // src/features fica de fora do it.each acima de proposito: ver
+  // designTokens.test.ts. Afirma o vazio atual em vez de so pular a
+  // checagem, e vira tripwire quando a Tarefa 2 criar o primeiro arquivo.
+  it('src/features ainda esta vazia nesta tarefa (Tarefa 2 cria o primeiro arquivo)', () => {
+    expect(arquivos('src/features').length).toBe(0);
+  });
+
   it.each(TODOS)('%s: se tem Pressable, declara role e label', (rel) => {
+    if (EXCECAO_APP_LEGADO.has(rel)) return;
     const conteudo = readFileSync(join(RAIZ, rel), 'utf8');
     if (!/<Pressable|AnimatedPressable/.test(conteudo)) return;
     expect(conteudo).toMatch(/accessibilityRole=/);
     expect(conteudo).toMatch(/accessibilityLabel[=:]/);
+  });
+});
+
+/**
+ * A lista de excecao precisa provar que esta viva: falha assim que um
+ * arquivo listado deixar de existir, em vez de continuar "protegendo" uma
+ * tela que ja migrou ou sumiu (lixo que finge cobertura).
+ */
+describe('guarda: excecao de app/ legado nao aponta pra arquivo fantasma', () => {
+  it.each([...EXCECAO_APP_LEGADO])('excecao %s ainda existe', (rel) => {
+    expect(existsSync(join(RAIZ, rel))).toBe(true);
   });
 });
 

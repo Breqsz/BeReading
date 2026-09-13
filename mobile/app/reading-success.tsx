@@ -8,8 +8,10 @@
 // antigo, porque tela velha que funciona vale mais que silencio bonito.
 //
 // Quando a F4 Tarefa 5 reescrever o sheet de registrar leitura, o caminho sem
-// capitulo fechado vira toast e este arquivo vai embora junto com a entrada
-// dele na EXCECAO_APP_LEGADO das guardas.
+// capitulo fechado vira toast e este arquivo vai embora junto com as duas
+// entradas dele nas guardas: EXCECAO_COR (designTokens.test.ts) e
+// EXCECAO_TIPOGRAFIA (o mesmo arquivo). So essas duas — a tela nao usa
+// Alert.alert, emoji, travessao nem Pressable sem rotulo.
 import { View, Text } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Check } from 'lucide-react-native';

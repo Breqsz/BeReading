@@ -28,7 +28,8 @@ Pré-requisitos: Node ≥ 20, app **Expo Go** no celular (iOS/Android), celular 
 
 ## Backend / Edge Functions (`supabase/functions`)
 
-Funções: `generate-questions`, `evaluate-answer`, `register-reading-session`, `award-badges`, `retry-pending-quizzes`.
+Funções: `generate-questions`, `evaluate-answer`, `register-reading-session`, `award-badges`,
+`retry-pending-quizzes`, `delete-account`, `lookup-book-by-isbn`, `check-chapter-completion` (stub).
 
 A IA do quiz é **configurável por secret** (sem mudar código):
 
@@ -38,12 +39,19 @@ A IA do quiz é **configurável por secret** (sem mudar código):
 | OpenAI | `AI_API_KEY`, `AI_MODEL` (default `gpt-4o-mini`) |
 | Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-haiku-4-5`) |
 
-Setar secrets / deploy (CLI Supabase autenticada via `SUPABASE_ACCESS_TOKEN`):
+Os secrets das functions continuam sendo definidos à mão (o deploy automático não mexe neles):
 
 ```bash
 supabase secrets set AI_PROVIDER=anthropic ANTHROPIC_API_KEY=<sk-ant-...> --project-ref <ref>
-supabase functions deploy generate-questions evaluate-answer --no-verify-jwt --project-ref <ref>
 ```
+
+## Deploy
+
+Migrations e Edge Functions vão para produção **automaticamente** depois que o CI passa no
+`main` (`.github/workflows/deploy.yml`, BER-50). Não implante da sua máquina e não aplique
+SQL de schema direto em produção — isso dessincroniza o histórico de migrations e trava o
+próximo deploy. Runbook completo (secrets, deploy manual, rotação de token, troubleshooting):
+[`docs/deploy.md`](docs/deploy.md).
 
 ## ⚠️ Known issues / dívida técnica
 

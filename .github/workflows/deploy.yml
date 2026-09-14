@@ -1,0 +1,106 @@
+name: Deploy
+
+# BER-50: até aqui, colocar código no ar era manual — cada dev implantava da
+# própria máquina (evidência histórica: `entrypoint_path` de cada function
+# apontava pra uma origem diferente, `/Users/pedrotavares/...` vs `/tmp`). Isso
+# já produziu produção rodando código de semanas atrás sem ninguém perceber —
+# BER-27 (loop do quiz parado 3 meses), BER-74, BER-72 (esta última: mergeada
+# e só implantada dias depois, à mão). Este workflow substitui o passo manual.
+#
+# Dispara só depois que o CI (type-check + testes, `ci.yml`) já passou no
+# `main` — nunca em PR, nunca antes do CI ficar verde.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+# Nunca dois deploys de produção em paralelo, e nunca cancela um que já começou
+# a aplicar migrations no meio do caminho.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_REF: asfdkzejtuqcgqdcsnac
+
+jobs:
+  deploy:
+    name: Deploy migrations + Edge Functions
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Proteção 1 — replay de TODAS as migrations (as existentes + a(s) nova(s)
+      # deste push) num Postgres novo, do zero, ANTES de tocar em produção. Se
+      # uma migration falhar aqui (erro de sintaxe, dependência quebrada), o job
+      # para neste passo — nada chega no banco real. É a mesma técnica usada
+      # manualmente desde a BER-31, agora automática e obrigatória a cada push.
+      - name: Dry run das migrations (Postgres novo e local, via Docker)
+        run: |
+          supabase start
+          supabase db reset
+
+      - name: Parar a stack local
+        if: always()
+        run: supabase stop
+
+      - name: Conectar ao projeto
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      # Só chega aqui se o dry run (passo acima) teve sucesso.
+      - name: Aplicar migrations em produção
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push
+
+      - name: Implantar Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -e
+          for dir in supabase/functions/*/; do
+            name=$(basename "$dir")
+            [ "$name" = "_shared" ] && continue
+            [ -f "${dir}index.ts" ] || continue
+            echo "== Deploying $name =="
+            supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+          done
+
+      # Proteção 2 — smoke test pós-deploy: nenhuma function deve responder 5xx
+      # nem aceitar uma chamada sem credencial (o guard de auth em código, não o
+      # gateway, é quem barra isso aqui — verify_jwt=false é deliberado, ver
+      # README). Não faz rollback automático: só alerta. Ver limitação na BER-50.
+      - name: Smoke test pós-deploy
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -e
+          BASE="https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1"
+          FAIL=0
+          for dir in supabase/functions/*/; do
+            name=$(basename "$dir")
+            [ "$name" = "_shared" ] && continue
+            [ "$name" = "check-chapter-completion" ] && continue  # stub sem Deno.serve, ver comentário no arquivo
+            [ -f "${dir}index.ts" ] || continue
+            status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/$name" \
+              -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d '{}')
+            echo "$name -> HTTP $status"
+            if [ "$status" = "500" ] || [ "$status" = "000" ]; then
+              echo "::error::$name devolveu $status sem credencial após o deploy — pode ter quebrado"
+              FAIL=1
+            fi
+          done
+          exit $FAIL

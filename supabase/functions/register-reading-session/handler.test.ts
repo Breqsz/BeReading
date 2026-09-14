@@ -205,6 +205,37 @@ Deno.test('register-reading-session: reler um trecho já registrado não soma p�
   }
 });
 
+Deno.test('register-reading-session: gratuito com 2 livros em leitura não reativa um terceiro por aqui — 402 (BER-58)', async () => {
+  const fake = startFakeSupabase({
+    users: { [TOKEN]: { id: USER_ID } },
+    tables: {
+      books: [{ id: 'book-3', total_pages: 300 }],
+      reading_sessions: [],
+      student_books: [
+        { id: 'sb1', user_id: USER_ID, book_id: 'book-1', status: 'reading', current_page: 10 },
+        { id: 'sb2', user_id: USER_ID, book_id: 'book-2', status: 'reading', current_page: 10 },
+        { id: 'sb3', user_id: USER_ID, book_id: 'book-3', status: 'dropped', current_page: 40 },
+      ],
+      chapters: [],
+    },
+  });
+  withEnv(fake.url);
+  Deno.env.delete('FREE_MAX_ACTIVE_BOOKS');
+
+  try {
+    const { handler } = await import('./index.ts');
+    const res = await handler(request({ user_id: USER_ID, book_id: 'book-3', start_page: 41, end_page: 60 }));
+    const json = await res.json();
+
+    assertEquals(res.status, 402);
+    assertEquals(json.data.reason, 'active_books');
+    assertEquals(fake.tables.reading_sessions.length, 0);
+    assertEquals(fake.tables.student_books.find((r) => r.id === 'sb3')?.status, 'dropped');
+  } finally {
+    await fake.close();
+  }
+});
+
 Deno.test('register-reading-session: intervalo parcialmente sobreposto conta só a parte nova (BER-68)', async () => {
   const fake = startFakeSupabase({
     users: { [TOKEN]: { id: USER_ID } },

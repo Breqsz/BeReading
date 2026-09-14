@@ -14,6 +14,7 @@ function withEnv(url: string) {
   Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', SERVICE_KEY);
   Deno.env.set('AI_PROVIDER', 'openai');
   Deno.env.set('AI_API_KEY', 'fake-ai-key');
+  Deno.env.delete('FREE_MONTHLY_QUIZ_CHAPTERS');
 }
 
 function request(body: unknown, authorization: string | null): Request {
@@ -148,6 +149,120 @@ Deno.test('evaluate-answer: responder de novo devolve 409 com a avaliação que 
     // não sobrescreveu a resposta original
     assertEquals(fake.tables.answers.length, 1);
     assertEquals(fake.tables.answers[0].answer_text, 'primeira resposta');
+  } finally {
+    await fake.close();
+  }
+});
+
+/** Leitor que já começou o quiz de `chapters` capítulos neste mês (fora o ch-1 do fixture). */
+function readerWithStartedChapters(chapters: string[]) {
+  const fixture = readerFixture();
+  const now = new Date().toISOString();
+  for (const ch of chapters) {
+    fixture.tables.questions.push({ id: `q-${ch}`, chapter_id: ch, question_text: 'P?', type: 'comprehension' });
+    fixture.tables.answers.push({
+      id: `a-${ch}`,
+      question_id: `q-${ch}`,
+      user_id: USER_ID,
+      answer_text: 'resposta antiga',
+      answered_at: now,
+      evaluation_status: 'completed',
+    });
+  }
+  return fixture;
+}
+
+const PREMIUM_SUBSCRIPTION = {
+  user_id: USER_ID,
+  plan_id: 'premium_monthly',
+  status: 'active',
+  provider: 'mock',
+  current_period_start: new Date(Date.now() - 86400000).toISOString(),
+  current_period_end: new Date(Date.now() + 29 * 86400000).toISOString(),
+  cancel_at_period_end: false,
+};
+
+Deno.test('evaluate-answer: gratuito com 4 quizzes começados no mês não abre o quinto — 402 sem gastar IA (BER-58)', async () => {
+  const fake = startFakeSupabase(readerWithStartedChapters(['ch-a', 'ch-b', 'ch-c', 'ch-d']));
+  withEnv(fake.url);
+
+  try {
+    const { handler } = await import('./index.ts');
+    const res = await withFailingAIFetch(
+      500,
+      () => handler(request({ question_id: 'q1', user_id: USER_ID, answer_text: 'minha resposta' }, `Bearer ${TOKEN}`)),
+    );
+    const json = await res.json();
+
+    assertEquals(res.status, 402);
+    assertEquals(json.error, 'quota_exceeded');
+    assertEquals(json.data.reason, 'quiz_chapters');
+    assertEquals(json.data.limit, 4);
+    assertEquals(json.data.used, 4);
+    assertEquals(fake.tables.answers.length, 4); // nada salvo
+  } finally {
+    await fake.close();
+  }
+});
+
+Deno.test('evaluate-answer: o limite mensal vem da env FREE_MONTHLY_QUIZ_CHAPTERS (BER-58)', async () => {
+  const fake = startFakeSupabase(readerWithStartedChapters(['ch-a', 'ch-b', 'ch-c', 'ch-d']));
+  withEnv(fake.url);
+  Deno.env.set('FREE_MONTHLY_QUIZ_CHAPTERS', '5');
+
+  try {
+    const { handler } = await import('./index.ts');
+    const res = await withMockedAIFetch(
+      VALID_EVALUATION,
+      () => handler(request({ question_id: 'q1', user_id: USER_ID, answer_text: 'minha resposta' }, `Bearer ${TOKEN}`)),
+    );
+    assertEquals(res.status, 200);
+    assertEquals(fake.tables.answers.length, 5);
+  } finally {
+    Deno.env.delete('FREE_MONTHLY_QUIZ_CHAPTERS');
+    await fake.close();
+  }
+});
+
+Deno.test('evaluate-answer: no limite, o capítulo que já foi começado continua respondível (BER-58)', async () => {
+  const fixture = readerWithStartedChapters(['ch-a', 'ch-b', 'ch-c']);
+  // 4º capítulo do mês é o próprio ch-1: uma pergunta dele já respondida.
+  fixture.tables.questions.push({ id: 'q1-b', chapter_id: 'ch-1', question_text: 'P2?', type: 'reflection' });
+  fixture.tables.answers.push({
+    id: 'a-ch1', question_id: 'q1-b', user_id: USER_ID, answer_text: 'x',
+    answered_at: new Date().toISOString(), evaluation_status: 'completed',
+  });
+  const fake = startFakeSupabase(fixture);
+  withEnv(fake.url);
+
+  try {
+    const { handler } = await import('./index.ts');
+    const res = await withMockedAIFetch(
+      VALID_EVALUATION,
+      () => handler(request({ question_id: 'q1', user_id: USER_ID, answer_text: 'minha resposta' }, `Bearer ${TOKEN}`)),
+    );
+    assertEquals(res.status, 200);
+  } finally {
+    await fake.close();
+  }
+});
+
+Deno.test('evaluate-answer: Premium não tem limite de quizzes (BER-61)', async () => {
+  const fixture = readerWithStartedChapters(['ch-a', 'ch-b', 'ch-c', 'ch-d']);
+  const fake = startFakeSupabase({
+    ...fixture,
+    tables: { ...fixture.tables, subscriptions: [PREMIUM_SUBSCRIPTION] },
+  });
+  withEnv(fake.url);
+
+  try {
+    const { handler } = await import('./index.ts');
+    const res = await withMockedAIFetch(
+      VALID_EVALUATION,
+      () => handler(request({ question_id: 'q1', user_id: USER_ID, answer_text: 'minha resposta' }, `Bearer ${TOKEN}`)),
+    );
+    assertEquals(res.status, 200);
+    assertEquals(fake.tables.answers.length, 5);
   } finally {
     await fake.close();
   }

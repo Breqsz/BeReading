@@ -410,6 +410,17 @@ verify_jwt = false
 [functions.evaluate-answer]
 verify_jwt = false
 
+# BER-58 / BER-61: plano, limites e assinatura.
+[functions.get-entitlement]
+verify_jwt = false
+
+[functions.reading-list]
+verify_jwt = false
+
+# Cobrança simulada — desliga com o secret BILLING_MODE diferente de `mock`.
+[functions.billing-mock]
+verify_jwt = false
+
 # --- Internas (service_role; o guard está no handler) ---
 [functions.generate-questions]
 verify_jwt = false

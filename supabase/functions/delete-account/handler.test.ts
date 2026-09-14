@@ -40,6 +40,7 @@ function fixture() {
         { id: 'a2', user_id: OTHER_USER_ID, question_id: 'q1' },
       ],
       student_badges: [{ user_id: USER_ID, badge_id: 'b1' }],
+      subscriptions: [{ user_id: USER_ID, plan_id: 'premium_monthly', status: 'active' }],
     },
   };
 }
@@ -78,6 +79,7 @@ Deno.test('delete-account: apaga só o dado do dono do JWT e a conta de auth, pr
     assertEquals(fake.tables.streaks.some((r) => r.user_id === USER_ID), false);
     assertEquals(fake.tables.answers.some((r) => r.user_id === USER_ID), false);
     assertEquals(fake.tables.student_badges.some((r) => r.user_id === USER_ID), false);
+    assertEquals(fake.tables.subscriptions.some((r) => r.user_id === USER_ID), false);
     assertEquals(fake.deletedAuthUsers, [USER_ID]);
 
     // ...mas o outro leitor não foi tocado.

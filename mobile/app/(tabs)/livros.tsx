@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Compass, CheckCheck } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { getStudentBooks } from '../../src/api/queries';
+import { useEntitlementStore } from '../../src/stores/entitlementStore';
 import { BookCard } from '../../src/components/BookCard';
 import { BookCover } from '../../src/components/BookCover';
 import { Press3DButton } from '../../src/components/Press3DButton';
@@ -28,12 +29,14 @@ export default function LivrosScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const entitlement = useEntitlementStore((s) => s.entitlement);
 
   useFocusEffect(
     useCallback(() => {
       if (!profile) { setLoading(false); return; }
       let cancelled = false;
       setError(null);
+      useEntitlementStore.getState().refresh();
 
       getStudentBooks(profile.user_id)
         .then((data) => { if (!cancelled) setBooks(data); })
@@ -62,6 +65,8 @@ export default function LivrosScreen() {
 
   const { reading, finished } = sectionBooksByStatus(books);
   const hasBooks = reading.length > 0 || finished.length > 0;
+  // BER-58: no gratuito, mostra quantas vagas de leitura simultânea existem.
+  const maxBooks = entitlement?.plan === 'free' ? entitlement.limits.max_active_books : null;
 
   if (loading) {
     return (
@@ -106,7 +111,7 @@ export default function LivrosScreen() {
             color: colors.textMute,
             marginTop: 2,
           }}>
-            {reading.length} em leitura · {finished.length} finalizado{finished.length !== 1 ? 's' : ''}
+            {reading.length}{maxBooks !== null ? ` de ${maxBooks}` : ''} em leitura · {finished.length} finalizado{finished.length !== 1 ? 's' : ''}
           </Text>
         </View>
 

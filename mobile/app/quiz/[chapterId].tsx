@@ -1,8 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Alert, ActivityIndicator, Pressable, Text } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Sparkles, BookOpen } from 'lucide-react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Sparkles, BookOpen, Crown } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useEntitlementStore } from '../../src/stores/entitlementStore';
+import {
+  isQuotaExceededError,
+  paywallCopy,
+  quizQuotaFor,
+  type QuotaExceeded,
+} from '../../src/utils/billing';
 import {
   getChapterQuizStatus,
   getStudentAnswersForChapter,
@@ -25,8 +32,10 @@ import { quizScreenStateFor } from '../../src/utils/quizStatus';
 // "ainda nao ficou pronto", nao "deu erro" — e a diferenca aparece na tela.
 // BER-66: 'no-content' tambem NAO e 'failed'. O capitulo nao tem texto cadastrado,
 // entao nao ha o que re-tentar — e mentir ("deu erro") esconde o motivo real.
+// BER-58: 'quota' tambem NAO e 'failed'. O leitor usou os quizzes do mes no plano
+// gratuito — a tela convida para o Premium em vez de dizer que deu erro.
 type ScreenState =
-  | 'loading' | 'polling' | 'ready' | 'failed' | 'still-generating' | 'no-content';
+  | 'loading' | 'polling' | 'ready' | 'failed' | 'still-generating' | 'no-content' | 'quota';
 
 export default function QuizScreen() {
   const { chapterId } = useLocalSearchParams<{ chapterId: string }>();
@@ -43,6 +52,17 @@ export default function QuizScreen() {
   const [evaluating, setEvaluating] = useState(false);
   // BER-48: o texto que o leitor escreveu em cada pergunta já respondida.
   const [answerTexts, setAnswerTexts] = useState<Record<number, string>>({});
+  const [quota, setQuota] = useState<QuotaExceeded | null>(null);
+  // Recarrega o quiz quando o leitor volta da tela de planos (assinou ou não).
+  const [reloadKey, setReloadKey] = useState(0);
+  const screenStateRef = useRef(screenState);
+  screenStateRef.current = screenState;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (screenStateRef.current === 'quota') setReloadKey((k) => k + 1);
+    }, []),
+  );
 
   /** Perguntas carregadas: o quiz abre mostrando o que já foi respondido (BER-48). */
   function applyLoaded({ questions: qs, progress }: Awaited<ReturnType<typeof loadQuizForReader>>) {
@@ -59,8 +79,21 @@ export default function QuizScreen() {
 
     async function load() {
       try {
-        const status = await getChapterQuizStatus(chapterId!);
+        // BER-58: sem cota no mês, o quiz de um capítulo novo nem abre — o leitor
+        // vê o convite antes de escrever uma resposta que o servidor recusaria.
+        // Se o plano não carregar, segue: a trava de verdade é o evaluate-answer.
+        const [status, entitlement] = await Promise.all([
+          getChapterQuizStatus(chapterId!),
+          useEntitlementStore.getState().refresh(),
+        ]);
         if (cancelled) return;
+
+        const blocked = entitlement ? quizQuotaFor(entitlement, chapterId!) : null;
+        if (blocked) {
+          setQuota(blocked);
+          setScreenState('quota');
+          return;
+        }
 
         const next = quizScreenStateFor(status);
         if (next === 'ready') {
@@ -78,7 +111,7 @@ export default function QuizScreen() {
 
     load();
     return () => { cancelled = true; };
-  }, [chapterId]);
+  }, [chapterId, reloadKey]);
 
   useEffect(() => {
     if (screenState !== 'polling') return;
@@ -135,6 +168,11 @@ export default function QuizScreen() {
         setAnswerTexts((prev) => ({ ...prev, [currentIndex]: answer.trim() }));
       }
     } catch (e: unknown) {
+      if (isQuotaExceededError(e)) {
+        setQuota(e.quota);
+        setScreenState('quota');
+        return;
+      }
       const msg = e instanceof Error ? e.message : 'Erro ao avaliar resposta';
       Alert.alert('Erro', msg);
     } finally {
@@ -170,6 +208,37 @@ export default function QuizScreen() {
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color={colors.green} />
       </View>
+    );
+  }
+
+  if (screenState === 'quota' && quota) {
+    const copy = paywallCopy(quota);
+    return (
+      <QuizMessageScreen
+        paddingTop={insets.top + 60}
+        paddingBottom={insets.bottom + 40}
+        icon={
+          <QuizMessageIconBadge background={colors.gold} borderColor={colors.goldDeep}>
+            <Crown size={32} color="#fff" strokeWidth={2.2} />
+          </QuizMessageIconBadge>
+        }
+        title={copy.title}
+        description={copy.hint ? `${copy.description}\n\n${copy.hint}` : copy.description}
+      >
+        <View style={{ width: '100%', gap: 8 }}>
+          <Press3DButton onPress={() => router.push('/planos')} color="gold" Icon={Crown}>
+            Conhecer o Premium
+          </Press3DButton>
+          <Pressable
+            onPress={() => router.back()}
+            style={{ paddingVertical: 12, paddingHorizontal: 24, alignItems: 'center' }}
+          >
+            <Text style={{ fontFamily: fonts.medium, fontSize: 14, color: colors.textMute }}>
+              Voltar
+            </Text>
+          </Pressable>
+        </View>
+      </QuizMessageScreen>
     );
   }
 

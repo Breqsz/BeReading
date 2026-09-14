@@ -14,6 +14,8 @@ import * as Haptics from 'expo-haptics';
 import { ArrowRight, CheckCheck } from 'lucide-react-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { useReadingStore } from '../src/stores/readingStore';
+import { useEntitlementStore } from '../src/stores/entitlementStore';
+import { isQuotaExceededError, paywallCopy, quizQuotaFor } from '../src/utils/billing';
 import { registerReadingSession } from '../src/api/edgeFunctions';
 import { getStudentBooks } from '../src/api/queries';
 import { validatePageRange } from '../src/utils/validation';
@@ -154,12 +156,18 @@ export default function RegisterReadingScreen() {
 
       if (firstChapterId) {
         const chapterId = firstChapterId;
+        // BER-58: sem cota de quiz no mês, o alerta oferece o Premium em vez de
+        // abrir um quiz que não vai aceitar a resposta.
+        const entitlement = await useEntitlementStore.getState().refresh();
+        const blocked = entitlement ? quizQuotaFor(entitlement, chapterId) : null;
         const capitulos = count === 1
           ? `Você completou um capítulo de "${book.title}"!`
           : `Você completou ${count} capítulos de "${book.title}"!`;
-        const perguntas = count === 1
-          ? 'Quer responder as perguntas agora?'
-          : 'Quer começar pelas perguntas do primeiro? Os outros ficam esperando na tela inicial.';
+        const perguntas = blocked
+          ? `${paywallCopy(blocked).title}. Com o Premium, as perguntas deste capítulo abrem agora.`
+          : count === 1
+            ? 'Quer responder as perguntas agora?'
+            : 'Quer começar pelas perguntas do primeiro? Os outros ficam esperando na tela inicial.';
         Alert.alert(
           count === 1 ? 'Capítulo completo!' : 'Capítulos completos!',
           `${capitulos}\n\nStreak: ${result.current_streak} dia${result.current_streak !== 1 ? 's' : ''}\n\n${perguntas}`,
@@ -175,7 +183,9 @@ export default function RegisterReadingScreen() {
                   params: { pagesRead: pagesRead ?? 0, streak: result.current_streak },
                 }),
             },
-            { text: 'Responder agora', onPress: () => router.replace(`/quiz/${chapterId}`) },
+            blocked
+              ? { text: 'Conhecer o Premium', onPress: () => router.replace('/planos') }
+              : { text: 'Responder agora', onPress: () => router.replace(`/quiz/${chapterId}`) },
           ],
         );
       } else {
@@ -185,6 +195,14 @@ export default function RegisterReadingScreen() {
         });
       }
     } catch (e: unknown) {
+      if (isQuotaExceededError(e)) {
+        const copy = paywallCopy(e.quota);
+        Alert.alert(copy.title, [copy.description, copy.hint].filter(Boolean).join('\n\n'), [
+          { text: 'Agora não', style: 'cancel' },
+          { text: 'Conhecer o Premium', onPress: () => router.push('/planos') },
+        ]);
+        return;
+      }
       const msg = e instanceof Error ? e.message : 'Tente novamente';
       Alert.alert('Erro ao registrar', msg);
     } finally {

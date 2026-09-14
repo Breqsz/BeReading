@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { PENDING_FEEDBACK } from '../utils/quizAnswers';
+import { parseQuotaExceeded, QuotaExceededError } from '../utils/billing';
+import type { StudentBook } from '../types/database';
 
 export interface RegisterReadingResponse {
   session_created: boolean;
@@ -44,7 +46,7 @@ export async function registerReadingSession(
   const { data, error } = await supabase.functions.invoke('register-reading-session', {
     body: buildRegisterReadingPayload(userId, bookId, startPage, endPage),
   });
-  if (error) throw error;
+  if (error) throw await quotaErrorOr(error);
   if (data.error) throw new Error(data.error);
   return data.data as RegisterReadingResponse;
 }
@@ -55,9 +57,11 @@ export async function registerReadingSession(
  * - 409: a pergunta já foi respondida (a resposta é imutável). O corpo traz a
  *   avaliação que ficou, e é ela que a tela mostra.
  * - 403 "Chapter not completed": o quiz ainda não abriu para este leitor.
+ * - 402 `quota_exceeded` (BER-58): acabou a cota de quizzes do plano gratuito.
  *
  * @returns a avaliação existente no 409; `null` quando o erro não é um desses.
  * @throws Error com mensagem para o leitor no 403 de capítulo não lido.
+ * @throws QuotaExceededError no 402, para a tela mostrar o convite ao Premium.
  */
 export function interpretEvaluateFailure(
   status: number | undefined,
@@ -67,6 +71,9 @@ export function interpretEvaluateFailure(
     error?: string;
     data?: { score?: number | null; feedback?: string } | null;
   };
+
+  const quota = parseQuotaExceeded(status, body);
+  if (quota) throw new QuotaExceededError(quota);
 
   if (status === 409) {
     return {
@@ -82,7 +89,7 @@ export function interpretEvaluateFailure(
 }
 
 /** Status e corpo de um erro não-2xx do supabase-js (a resposta vem em `context`). */
-async function readHttpError(error: unknown): Promise<{ status?: number; body: unknown }> {
+export async function readHttpError(error: unknown): Promise<{ status?: number; body: unknown }> {
   const context = (error as { context?: { status?: number; json?: () => Promise<unknown> } })
     ?.context;
   if (!context) return { body: null };
@@ -93,6 +100,43 @@ async function readHttpError(error: unknown): Promise<{ status?: number; body: u
     body = null;
   }
   return { status: context.status, body };
+}
+
+/** BER-58: o 402 de limite do plano vira `QuotaExceededError`; qualquer outro erro volta como veio. */
+async function quotaErrorOr(error: unknown): Promise<unknown> {
+  const { status, body } = await readHttpError(error);
+  const quota = parseQuotaExceeded(status, body);
+  return quota ? new QuotaExceededError(quota) : error;
+}
+
+export interface ReadingListResult {
+  book_id: string;
+  status: StudentBook['status'];
+  current_page: number;
+}
+
+async function invokeReadingList(action: 'start' | 'stop', bookId: string): Promise<ReadingListResult> {
+  const { data, error } = await supabase.functions.invoke('reading-list', {
+    body: { action, book_id: bookId },
+  });
+  if (error) throw await quotaErrorOr(error);
+  if (data.error) throw new Error(data.error);
+  return data.data as ReadingListResult;
+}
+
+/**
+ * BER-58: coloca o livro em leitura. Livro tirado da leitura antes volta da
+ * página em que parou.
+ *
+ * @throws QuotaExceededError quando o plano gratuito já está no limite de livros.
+ */
+export function startReadingBook(bookId: string): Promise<ReadingListResult> {
+  return invokeReadingList('start', bookId);
+}
+
+/** BER-58: tira o livro da leitura — libera a vaga e guarda a página. */
+export function stopReadingBook(bookId: string): Promise<ReadingListResult> {
+  return invokeReadingList('stop', bookId);
 }
 
 export async function evaluateAnswer(

@@ -5,6 +5,8 @@ import { hasReachedChapterEnd } from '../_shared/progress.ts';
 import { notifyOps } from '../_shared/ops-alert.ts';
 import { existingAnswerResult, isUniqueViolation, PENDING_FEEDBACK } from './submission.ts';
 import { parseEvaluation, type ParsedEvaluation } from '../_shared/ai-json.ts';
+import { loadEntitlement } from '../_shared/entitlement.ts';
+import { canAnswerChapter, quotaExceededResponse } from '../_shared/plan-rules.ts';
 import type { AnswerPayload } from '../_shared/types.ts';
 // BER-35: o prompt vive em módulo próprio para ser testado de verdade.
 // BER-65: sem "aluno" e sem "ensino fundamental" — o leitor é adulto.
@@ -270,6 +272,22 @@ export async function handler(req: Request): Promise<Response> {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // BER-58: a cota do plano gratuito mora aqui, não em generate-questions. As
+  // perguntas são cache por capítulo, compartilhado entre todos os leitores —
+  // gerar custa uma vez por capítulo. O custo de IA que cresce por leitor é a
+  // avaliação (uma chamada por resposta). Capítulo já começado nunca trava no meio.
+  const entitlement = await loadEntitlement(supabase, user_id);
+  const quota = canAnswerChapter({
+    premium: entitlement.premium,
+    limits: entitlement.limits,
+    chapterId: question.chapter_id,
+    startedChapterIds: entitlement.startedChapterIds,
+    chaptersThisMonth: entitlement.chaptersThisMonth,
+  });
+  if (!quota.allowed) {
+    return quotaExceededResponse('quiz_chapters', quota, entitlement.usageResetsAt);
   }
 
   // BER-48: a resposta é imutável — insert, não upsert (ver submission.ts).

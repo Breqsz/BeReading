@@ -17,6 +17,8 @@ const USER_OWNED_TABLES = [
   'streaks',
   'student_books',
   'reading_sessions',
+  // BER-61: a assinatura referencia `profiles` — sai antes dele.
+  'subscriptions',
   'profiles',
 ] as const;
 

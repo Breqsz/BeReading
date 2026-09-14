@@ -3,6 +3,8 @@ import { createServiceClient } from '../_shared/supabase-client.ts';
 import { authErrorResponse, resolveUserId } from '../_shared/auth.ts';
 import { dispatchBackground } from '../_shared/background.ts';
 import type { ReadingSessionPayload } from '../_shared/types.ts';
+import { loadEntitlement } from '../_shared/entitlement.ts';
+import { canStartBook, quotaExceededResponse } from '../_shared/plan-rules.ts';
 // BER-35: a lógica pura vive em `reading.ts` para que o teste exercite o código
 // real. Antes ficava aqui dentro, sem export, e o teste testava cópias suas.
 import {
@@ -84,6 +86,30 @@ export async function handler(req: Request): Promise<Response> {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // BER-58: registrar leitura de um livro fora da estante (ou tirado da leitura)
+  // coloca o livro em leitura no upsert do passo 4. Sem esta checagem, era um
+  // atalho em volta do limite de livros simultâneos que `reading-list` aplica.
+  const { data: studentBookRows } = await supabase
+    .from('student_books')
+    .select('status')
+    .eq('user_id', user_id)
+    .eq('book_id', book_id)
+    .limit(1);
+  const currentStatus = (studentBookRows?.[0] as { status: string } | undefined)?.status;
+
+  if (!currentStatus || currentStatus === 'dropped') {
+    const entitlement = await loadEntitlement(supabase, user_id);
+    const quota = canStartBook({
+      premium: entitlement.premium,
+      limits: entitlement.limits,
+      bookId: book_id,
+      activeBookIds: entitlement.activeBookIds,
+    });
+    if (!quota.allowed) {
+      return quotaExceededResponse('active_books', quota, null);
+    }
   }
 
   // 2. Buscar sessões anteriores para calcular progresso

@@ -62,7 +62,37 @@ jobs:
             generate-questions/index.ts \
             retry-pending-quizzes/index.ts \
             check-chapter-completion/index.ts \
-            delete-account/index.ts
+            delete-account/index.ts \
+            lookup-book-by-isbn/index.ts
 
       - name: Testes
         run: deno test --allow-net --allow-env
+
+  # BER-50: a pipeline de deploy (deploy.yml) aplica toda migration nova
+  # automaticamente depois do merge — sem revisão humana no meio. Esta checagem
+  # não impede o merge, mas obriga quem escreve uma migration destrutiva a
+  # reconhecer isso de propósito, em vez de deixar passar sem perceber.
+  migration-safety:
+    name: Migrations — bloqueia operação destrutiva sem reconhecimento
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Exigir "-- allow-destructive" em migration com DROP/TRUNCATE/DELETE
+        run: |
+          set -e
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          NEW_FILES=$(git diff --name-only --diff-filter=A "$BASE_SHA"...HEAD -- supabase/migrations/ || true)
+          FAIL=0
+          for f in $NEW_FILES; do
+            if grep -qiE 'drop[[:space:]]+table|drop[[:space:]]+column|truncate|delete[[:space:]]+from' "$f"; then
+              if ! grep -q -- '-- allow-destructive:' "$f"; then
+                echo "::error file=${f}::Migration com operação destrutiva (DROP/TRUNCATE/DELETE) sem reconhecimento explícito. Adicione um comentário '-- allow-destructive: <motivo>' no arquivo confirmando que é intencional — o deploy automático (BER-50) aplica isso sem revisão humana."
+                FAIL=1
+              fi
+            fi
+          done
+          exit $FAIL

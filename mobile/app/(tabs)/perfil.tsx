@@ -8,7 +8,7 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookOpen, Trophy, Award } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -20,6 +20,8 @@ import { Card } from '../../src/components/Card';
 import { Press3DButton } from '../../src/components/Press3DButton';
 import { SectionLabel } from '../../src/components/SectionLabel';
 import { LottieSlot } from '../../src/components/LottieSlot';
+import { PlanCard } from '../../src/components/PlanCard';
+import { useEntitlementStore } from '../../src/stores/entitlementStore';
 import { Flame } from 'lucide-react-native';
 import {
   getStreak,
@@ -35,7 +37,9 @@ import type { Streak, Badge, StudentBadge, StudentBook, ReadingSession } from '.
 
 export default function PerfilScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { profile, profileStatus, clear } = useAuthStore();
+  const entitlement = useEntitlementStore((s) => s.entitlement);
   const [streak, setStreak] = useState<Streak | null>(null);
   const [studentBadges, setStudentBadges] = useState<(StudentBadge & { badge: Badge })[]>([]);
   const [allBadges, setAllBadges] = useState<Badge[]>([]);
@@ -71,6 +75,8 @@ export default function PerfilScreen() {
     studentId: string,
     guard: (fn: () => void) => void = (fn) => fn(),
   ) {
+    // BER-61: o card do plano não segura o resto do perfil — carrega em paralelo.
+    useEntitlementStore.getState().refresh();
     const [s, sb, ab, books, sess] = await Promise.all([
       getStreak(studentId),
       getStudentBadges(studentId),
@@ -258,6 +264,8 @@ export default function PerfilScreen() {
         </View>
 
         <View style={{ paddingHorizontal: 20, gap: 20 }}>
+          <PlanCard entitlement={entitlement} onPress={() => router.push('/planos')} />
+
           {/* Heroic stats */}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <HeroicStat value={totalPages} label="páginas" Icon={BookOpen} color={colors.green} />

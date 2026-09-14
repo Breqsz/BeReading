@@ -5,10 +5,16 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight, Lock } from 'lucide-react-native';
-import { getBookWithChapters, getCurrentPage } from '../../src/api/queries';
+import { BookmarkMinus, BookmarkPlus, ChevronRight, Lock } from 'lucide-react-native';
+import { getBookWithChapters, getStudentBookEntry } from '../../src/api/queries';
+import { startReadingBook, stopReadingBook } from '../../src/api/edgeFunctions';
+import { GhostButton } from '../../src/components/GhostButton';
+import { PaywallSheet } from '../../src/components/PaywallSheet';
+import { useEntitlementStore } from '../../src/stores/entitlementStore';
+import { isQuotaExceededError, type QuotaExceeded } from '../../src/utils/billing';
 import { TopBar } from '../../src/components/TopBar';
 import { BookCover } from '../../src/components/BookCover';
 import { Card } from '../../src/components/Card';
@@ -18,7 +24,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { colors, fonts, radii } from '../../src/theme/tokens';
 import { categoryOf } from '../../src/theme/categories';
 import { chapterLockState } from '../../src/utils/chapterGate';
-import type { Book, Chapter } from '../../src/types/database';
+import type { Book, Chapter, StudentBook } from '../../src/types/database';
 
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,6 +35,10 @@ export default function BookDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   // BER-48: até onde o leitor chegou neste livro. `null` = ainda não se sabe.
   const [currentPage, setCurrentPage] = useState<number | null>(null);
+  // BER-58: se o livro está em leitura, tirado da leitura ou nunca começado (`null`).
+  const [readingStatus, setReadingStatus] = useState<StudentBook['status'] | null>(null);
+  const [updatingList, setUpdatingList] = useState(false);
+  const [paywall, setPaywall] = useState<QuotaExceeded | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -48,13 +58,49 @@ export default function BookDetailScreen() {
     if (!id || !profile) return;
     let cancelled = false;
 
-    getCurrentPage(profile.user_id, id)
-      .then((page) => { if (!cancelled) setCurrentPage(page); })
+    getStudentBookEntry(profile.user_id, id)
+      .then((entry) => {
+        if (cancelled) return;
+        setCurrentPage(entry?.current_page ?? 0);
+        setReadingStatus(entry?.status ?? null);
+      })
       // Sem a página atual a tela não bloqueia nada; a trava de verdade é o servidor.
       .catch(() => { if (!cancelled) setCurrentPage(null); });
 
     return () => { cancelled = true; };
   }, [id, profile?.user_id]);
+
+  // BER-58: no plano gratuito só dá para acompanhar alguns livros por vez. Tirar
+  // um da leitura libera a vaga e guarda a página — voltar continua de onde parou.
+  async function updateReadingList(action: 'start' | 'stop') {
+    if (!id || updatingList) return;
+    setUpdatingList(true);
+    try {
+      const result = action === 'start' ? await startReadingBook(id) : await stopReadingBook(id);
+      setReadingStatus(result.status);
+      useEntitlementStore.getState().refresh();
+    } catch (e: unknown) {
+      if (isQuotaExceededError(e)) {
+        setPaywall(e.quota);
+        return;
+      }
+      Alert.alert('Não foi possível atualizar sua estante', e instanceof Error ? e.message : 'Tente novamente');
+    } finally {
+      setUpdatingList(false);
+    }
+  }
+
+  function handleStopReading() {
+    if (updatingList) return;
+    Alert.alert(
+      'Tirar da leitura?',
+      `Seu progresso fica salvo${currentPage ? ` na página ${currentPage}` : ''}. O livro sai da sua estante e a vaga fica livre para outro — dá para voltar a ele quando quiser.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Tirar da leitura', style: 'destructive', onPress: () => updateReadingList('stop') },
+      ],
+    );
+  }
 
   if (loading) {
     return (
@@ -148,6 +194,17 @@ export default function BookDetailScreen() {
             </View>
           </View>
         </View>
+
+        {readingStatus === 'reading' && (
+          <GhostButton onPress={handleStopReading} Icon={BookmarkMinus}>
+            {updatingList ? 'Atualizando…' : 'Tirar da leitura'}
+          </GhostButton>
+        )}
+        {readingStatus === 'dropped' && (
+          <Press3DButton onPress={() => updateReadingList('start')} disabled={updatingList} Icon={BookmarkPlus}>
+            {updatingList ? 'Atualizando…' : 'Voltar a ler'}
+          </Press3DButton>
+        )}
 
         {/* Capítulos */}
         <View>
@@ -246,6 +303,8 @@ export default function BookDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <PaywallSheet quota={paywall} onDismiss={() => setPaywall(null)} />
     </View>
   );
 }

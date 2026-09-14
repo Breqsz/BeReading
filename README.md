@@ -28,7 +28,8 @@ Pré-requisitos: Node ≥ 20, app **Expo Go** no celular (iOS/Android), celular 
 
 ## Backend / Edge Functions (`supabase/functions`)
 
-Funções: `generate-questions`, `evaluate-answer`, `register-reading-session`, `award-badges`, `retry-pending-quizzes`.
+Funções: `generate-questions`, `evaluate-answer`, `register-reading-session`, `award-badges`, `retry-pending-quizzes`,
+`delete-account`, `get-entitlement`, `reading-list`, `billing-mock`.
 
 A IA do quiz é **configurável por secret** (sem mudar código):
 
@@ -44,6 +45,24 @@ Setar secrets / deploy (CLI Supabase autenticada via `SUPABASE_ACCESS_TOKEN`):
 supabase secrets set AI_PROVIDER=anthropic ANTHROPIC_API_KEY=<sk-ant-...> --project-ref <ref>
 supabase functions deploy generate-questions evaluate-answer --no-verify-jwt --project-ref <ref>
 ```
+
+## Planos e assinatura (BER-58 / BER-61)
+
+- **Gratuito:** os limites são secrets das Edge Functions. Dá para mudar sem migration e sem deploy de código:
+
+  | Secret | Default | O que limita |
+  |---|---|---|
+  | `FREE_MAX_ACTIVE_BOOKS` | `2` | Livros em leitura ao mesmo tempo. Tirar um livro da leitura libera a vaga, e a página em que parou fica salva. |
+  | `FREE_MONTHLY_QUIZ_CHAPTERS` | `4` | Capítulos com quiz iniciados no mês. Um capítulo já começado nunca trava no meio. Zera à meia-noite do dia 1, no horário de São Paulo. |
+
+  Aceitam um inteiro ≥ 0 ou `unlimited`. Um valor inválido cai no default.
+
+  ```bash
+  supabase secrets set FREE_MONTHLY_QUIZ_CHAPTERS=6 --project-ref <ref>
+  ```
+
+- **Premium:** R$ 24,90/mês, sem limites. Quem aplica os limites é o servidor (`evaluate-answer`, `reading-list` e `register-reading-session`). O app só mostra o que `get-entitlement` devolve.
+- ⚠️ **A cobrança é simulada.** O `billing-mock` assina, cancela e retoma sem cobrar nada, e grava `provider = 'mock'` em `subscriptions`. Enquanto isso valer, **qualquer usuário logado consegue virar Premium**. O mock desliga com `BILLING_MODE` diferente de `mock`. A troca pela compra in-app real está na **BER-79**.
 
 ## ⚠️ Known issues / dívida técnica
 

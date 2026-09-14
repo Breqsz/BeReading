@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/stores/authStore';
+import { useEntitlementStore } from '../src/stores/entitlementStore';
 import { loadOrCreateProfile } from '../src/api/profile';
 import { useLuminousFonts } from '../src/theme/fonts';
 
@@ -54,6 +55,8 @@ export default function RootLayout() {
         await hydrateProfile(session);
       } else {
         clear();
+        // BER-61: o plano do leitor anterior não pode vazar para o próximo login.
+        useEntitlementStore.getState().clear();
       }
     });
 

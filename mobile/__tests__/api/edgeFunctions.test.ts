@@ -9,8 +9,12 @@ import {
   evaluateAnswer,
   interpretEvaluateFailure,
   deleteAccount,
+  registerReadingSession,
+  startReadingBook,
+  stopReadingBook,
 } from '../../src/api/edgeFunctions';
 import { supabase } from '../../src/lib/supabase';
+import { isQuotaExceededError } from '../../src/utils/billing';
 
 const invoke = supabase.functions.invoke as jest.Mock;
 
@@ -102,6 +106,66 @@ describe('buildEvaluateAnswerPayload', () => {
   it('retorna null para answer vazia após trim', () => {
     const result = buildEvaluateAnswerPayload('q-1', 'user-1', '   ');
     expect(result).toBeNull();
+  });
+});
+
+const QUOTA_BODY = {
+  error: 'quota_exceeded',
+  data: { reason: 'active_books', limit: 2, used: 2, resets_at: null },
+};
+
+describe('limites do plano (BER-58)', () => {
+  beforeEach(() => invoke.mockReset());
+
+  it('402 no evaluate-answer vira QuotaExceededError com os dados do limite', async () => {
+    invoke.mockResolvedValue({
+      data: null,
+      error: httpError(402, {
+        error: 'quota_exceeded',
+        data: { reason: 'quiz_chapters', limit: 4, used: 4, resets_at: '2026-10-01T03:00:00.000Z' },
+      }),
+    });
+
+    const err = await evaluateAnswer('q-1', 'user-1', 'resposta').catch((e) => e);
+    expect(isQuotaExceededError(err)).toBe(true);
+    expect(err.quota).toEqual({ reason: 'quiz_chapters', limit: 4, used: 4, resets_at: '2026-10-01T03:00:00.000Z' });
+  });
+
+  it('interpretEvaluateFailure lança no 402 de cota', () => {
+    expect(() => interpretEvaluateFailure(402, QUOTA_BODY)).toThrow('Você já está lendo 2 livros');
+  });
+
+  it('startReadingBook chama reading-list com action start', async () => {
+    invoke.mockResolvedValue({
+      data: { data: { book_id: 'book-1', status: 'reading', current_page: 1 }, error: null },
+      error: null,
+    });
+    await expect(startReadingBook('book-1')).resolves.toEqual({ book_id: 'book-1', status: 'reading', current_page: 1 });
+    expect(invoke).toHaveBeenCalledWith('reading-list', { body: { action: 'start', book_id: 'book-1' } });
+  });
+
+  it('startReadingBook no limite de livros lança QuotaExceededError', async () => {
+    invoke.mockResolvedValue({ data: null, error: httpError(402, QUOTA_BODY) });
+    const err = await startReadingBook('book-3').catch((e) => e);
+    expect(isQuotaExceededError(err)).toBe(true);
+  });
+
+  it('stopReadingBook chama reading-list com action stop', async () => {
+    invoke.mockResolvedValue({
+      data: { data: { book_id: 'book-1', status: 'dropped', current_page: 42 }, error: null },
+      error: null,
+    });
+    await expect(stopReadingBook('book-1')).resolves.toEqual({ book_id: 'book-1', status: 'dropped', current_page: 42 });
+    expect(invoke).toHaveBeenCalledWith('reading-list', { body: { action: 'stop', book_id: 'book-1' } });
+  });
+
+  it('registerReadingSession: 402 vira QuotaExceededError; outros erros seguem como vieram', async () => {
+    invoke.mockResolvedValue({ data: null, error: httpError(402, QUOTA_BODY) });
+    expect(isQuotaExceededError(await registerReadingSession('u', 'b', 1, 10).catch((e) => e))).toBe(true);
+
+    const other = httpError(500, { error: 'Failed to create session' });
+    invoke.mockResolvedValue({ data: null, error: other });
+    await expect(registerReadingSession('u', 'b', 1, 10)).rejects.toBe(other);
   });
 });
 

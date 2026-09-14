@@ -129,14 +129,26 @@ export async function getClassroomBooks(classroomId: string): Promise<Book[]> {
   return (data ?? []).map((row: any) => row.book) as Book[];
 }
 
-export async function addBookToReadingList(userId: string, bookId: string) {
-  const { error } = await supabase
+// BER-58: `addBookToReadingList` saiu daqui. Começar e tirar livro da leitura
+// passa pela Edge Function `reading-list` (ver api/edgeFunctions.ts), que aplica
+// o limite de livros simultâneos do plano gratuito.
+
+/**
+ * Status e página do leitor neste livro, incluindo livro tirado da leitura
+ * (`dropped`) — `getStudentBooks` esconde esses. `null` = nunca começou.
+ */
+export async function getStudentBookEntry(
+  userId: string,
+  bookId: string,
+): Promise<Pick<StudentBook, 'status' | 'current_page'> | null> {
+  const { data, error } = await supabase
     .from('student_books')
-    .upsert(
-      { user_id: userId, book_id: bookId, status: 'reading', current_page: 1 } as any,
-      { onConflict: 'user_id,book_id' },
-    );
+    .select('status, current_page')
+    .eq('user_id', userId)
+    .eq('book_id', bookId)
+    .maybeSingle();
   if (error) throw error;
+  return data;
 }
 
 export async function getBookWithChapters(bookId: string): Promise<(Book & { chapters: Chapter[] }) | null> {

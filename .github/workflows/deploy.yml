@@ -54,18 +54,15 @@ jobs:
         if: always()
         run: supabase stop
 
-      - name: Conectar ao projeto
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --debug
-
+      # Sem `supabase link`: ele lê /v1/projects/{ref}/api-keys, que devolve 403
+      # para membros Administrator. Nada aqui precisa do link — o push conecta
+      # direto pela connection string (Session pooler; o host direto é só IPv6 e
+      # os runners do GitHub não têm IPv6).
       # Só chega aqui se o dry run (passo acima) teve sucesso.
       - name: Aplicar migrations em produção
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: supabase db push
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
 
       - name: Implantar Edge Functions
         env:

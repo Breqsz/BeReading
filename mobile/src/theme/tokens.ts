@@ -10,6 +10,9 @@ export const color = {
   surface2: '#25221E',
   surface3: '#302C27',
   floating: '#2A2622',
+  // Fundo escurecido atras de sheet e modal: esconde a tela sem apagar o
+  // contexto de onde o leitor veio.
+  scrim: 'rgba(0,0,0,0.6)',
 
   line: 'rgba(243,237,226,0.08)',
   line2: 'rgba(243,237,226,0.14)',

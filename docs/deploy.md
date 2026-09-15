@@ -93,7 +93,9 @@ O projeto está no **plano gratuito do Supabase, que não faz backup**. Até mig
 - **O que exporta:** três arquivos via `supabase db dump`:
   - `roles.sql`: papéis do banco;
   - `schema.sql`: estrutura;
-  - `data.sql`: dados, **incluindo as contas (`auth.users`)**. O `vault` fica de fora.
+  - `data.sql`: dados, **incluindo as contas (`auth.users`)**. Ficam de fora o `vault`, o
+    agendamento e o histórico do cron e duas tabelas internas vazias do Storage (lista em
+    [Limites](#limites)).
 - **Criptografia:** os três arquivos viram um `.tar.gz`, criptografado com GPG (AES-256) usando o
   secret `BACKUP_ENCRYPTION_KEY`. Só o arquivo `.gpg` sai do runner.
 - **Verificação:** o próprio job descriptografa a cópia, restaura num Supabase local vazio e
@@ -144,15 +146,49 @@ testar a mesma cópia num Supabase local (passos 1 a 4 abaixo, trocando o destin
      -c 'SET session_replication_role = replica' \
      -f data.sql
    ```
-5. Confira login de uma conta de teste, contagens principais e o cron `retry-pending-quizzes`.
-6. **Apague os arquivos descriptografados** (`.sql` e `.tar.gz`) da máquina. Eles têm dados
+5. **Recrie os segredos do Vault e o agendamento do cron.** Nenhum dos dois está na cópia: o
+   `vault` fica de fora de propósito, e `cron.job` pertence a um papel de sistema que o `postgres`
+   não pode escrever. No SQL Editor do projeto restaurado:
+   ```sql
+   -- valores: URL do projeto (https://<ref>.supabase.co) e o CRON_SECRET das Edge Functions
+   select vault.create_secret('<url-do-projeto>', 'project_url');
+   select vault.create_secret('<valor-do-CRON_SECRET>', 'cron_secret');
+
+   select cron.schedule(
+     'retry-pending-quizzes',
+     '0 * * * *',
+     $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')
+              || '/functions/v1/retry-pending-quizzes',
+       headers := jsonb_build_object(
+         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets
+                                        where name = 'cron_secret'),
+         'Content-Type', 'application/json'
+       ),
+       body := '{}'::jsonb,
+       timeout_milliseconds := 60000
+     );
+     $$
+   );
+   ```
+   **Não use o bloco de cron da migration baseline** (`20260910210000_...`): ele ainda lê o
+   segredo antigo `cron_service_role_key`, e o comando em produção foi alterado depois (BER-33).
+   O SQL acima é o que roda em produção em 15/09/2026.
+6. Confira login de uma conta de teste, as contagens principais e, na hora cheia seguinte, uma
+   execução com sucesso do `retry-pending-quizzes` em `cron.job_run_details`.
+7. **Apague os arquivos descriptografados** (`.sql` e `.tar.gz`) da máquina. Eles têm dados
    pessoais em claro.
 
 ### Limites
 
 - **Perda máxima de até 24h**, o intervalo entre backups.
 - **Restauração manual**, com o app fora do ar enquanto roda.
-- **Não inclui arquivos do Storage**, só os metadados.
+- **Não inclui os arquivos do Storage**, só os metadados. Em 15/09/2026 o Storage tem um bucket
+  público, `public-assets`, com 6 arquivos estáticos do app (~9,8 MB, de 30/03/2026), nenhum
+  enviado por leitores. Se o app passar a guardar arquivo de usuário, este backup não cobre.
+- **Fora da cópia, de propósito:** segredos do `vault`, o agendamento `cron.job`, o histórico
+  `cron.job_run_details` e as tabelas vazias `storage.buckets_vectors` e `storage.vector_indexes`.
 - **Workflows agendados em repositório público são desligados pelo GitHub após 60 dias sem
   atividade no repositório.** Se o projeto ficar parado, confira se o Backup continua ativo
   em Actions.

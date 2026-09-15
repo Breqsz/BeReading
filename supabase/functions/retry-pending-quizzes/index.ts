@@ -8,6 +8,7 @@
 // (BER-31). Melhor um nome apertado do que um cron que para de rodar.
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { assertInternalCaller, authErrorResponse } from '../_shared/auth.ts';
+import { internalCallHeaders } from '../_shared/keys.ts';
 import { acceptedCallerKeys } from './callers.ts';
 import { buildPendingFilter } from './filter.ts';
 import {
@@ -25,12 +26,12 @@ type SupabaseClient = ReturnType<typeof createServiceClient>;
 
 interface Invoker {
   url: string;
-  key: string;
+  authHeaders: Record<string, string>;
 }
 
-/** POST em outra Edge Function com a service_role key. */
+/** POST em outra Edge Function com a chave de servidor (ver `internalCallHeaders`). */
 async function invoke(
-  { url, key }: Invoker,
+  { url, authHeaders }: Invoker,
   fn: string,
   body: Record<string, unknown>,
 ): Promise<boolean> {
@@ -39,7 +40,7 @@ async function invoke(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
+        ...authHeaders,
       },
       body: JSON.stringify(body),
     });
@@ -157,9 +158,9 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const authHeaders = internalCallHeaders((name) => Deno.env.get(name));
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || Object.keys(authHeaders).length === 0) {
     return new Response(JSON.stringify({ error: 'Missing env vars' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -167,7 +168,7 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   const supabase = createServiceClient();
-  const invoker: Invoker = { url: supabaseUrl, key: serviceRoleKey };
+  const invoker: Invoker = { url: supabaseUrl, authHeaders };
 
   const retried = await retryQuizGeneration(supabase, invoker);
   if (retried === null) {

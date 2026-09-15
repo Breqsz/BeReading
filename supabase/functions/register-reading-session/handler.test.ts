@@ -12,6 +12,7 @@ const USER_ID = 'user-1';
 function withEnv(url: string) {
   Deno.env.set('SUPABASE_URL', url);
   Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key-teste');
+  Deno.env.delete('SUPABASE_SECRET_KEYS');
 }
 
 /** Espera o event loop girar — o dispatch em segundo plano não é aguardado pelo handler. */
@@ -73,7 +74,47 @@ Deno.test({
       await flushBackgroundTasks();
       const dispatched = fake.calls.find((c) => c.path.startsWith('/functions/v1/generate-questions'));
       assertEquals(dispatched?.body, { chapter_id: 'ch-1' });
+      // Sem SUPABASE_SECRET_KEYS, o disparo segue com a service_role legada (BER-76).
+      assertEquals(dispatched?.headers.authorization, 'Bearer service-role-key-teste');
     } finally {
+      await fake.close();
+    }
+  },
+});
+
+Deno.test({
+  name: 'register-reading-session: com a secret key, dispara quiz e medalhas pelo apikey, não pelo Authorization (BER-76)',
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const fake = startFakeSupabase({
+      users: { [TOKEN]: { id: USER_ID } },
+      tables: {
+        books: [{ id: 'book-1', total_pages: 300 }],
+        reading_sessions: [],
+        student_books: [],
+        streaks: [],
+        chapters: [{ id: 'ch-1', book_id: 'book-1', number: 1, end_page: 50 }],
+        chapter_quiz_status: [],
+      },
+    });
+    withEnv(fake.url);
+    Deno.env.set('SUPABASE_SECRET_KEYS', JSON.stringify({ default: 'sb_secret_teste' }));
+
+    try {
+      const { handler } = await import('./index.ts');
+      const res = await handler(request({ user_id: USER_ID, book_id: 'book-1', start_page: 1, end_page: 50 }));
+      assertEquals(res.status, 200);
+      await res.body?.cancel();
+
+      await flushBackgroundTasks();
+      for (const fn of ['generate-questions', 'award-badges']) {
+        const dispatched = fake.calls.find((c) => c.path.startsWith(`/functions/v1/${fn}`));
+        assertEquals(dispatched?.headers.apikey, 'sb_secret_teste', fn);
+        assertEquals(dispatched?.headers.authorization, undefined, fn);
+      }
+    } finally {
+      Deno.env.delete('SUPABASE_SECRET_KEYS');
       await fake.close();
     }
   },

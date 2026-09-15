@@ -48,7 +48,7 @@ Settings → Secrets and variables → Actions:
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | deploy das Edge Functions | Dashboard → avatar → Access Tokens. Escopo: projeto BeReading, Full access |
 | `SUPABASE_DB_URL` | `db push` | Projeto → **Connect** → **Direct** → **Session pooler** (porta 5432), com a senha do banco |
-| `SUPABASE_ANON_KEY` | smoke test | Project Settings → API Keys |
+| `SUPABASE_ANON_KEY` | smoke test | Project Settings → API Keys → a **publishable key** (`sb_publishable_…`). Não use a `anon` legada, que será desativada (BER-76) |
 | `BACKUP_ENCRYPTION_KEY` | `backup.yml` (criptografia do backup) | Gerada pelo time; cópia obrigatória no gerenciador de senhas. Ver [Backup e restauração](#backup-e-restauração) |
 
 Ao gravar, evite espaço ou quebra de linha no final do valor. No PowerShell:

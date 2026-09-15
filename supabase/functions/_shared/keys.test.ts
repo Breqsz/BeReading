@@ -1,7 +1,7 @@
 // supabase/functions/_shared/keys.test.ts
 // Testa o módulo REAL (import de ./keys.ts), não uma cópia — ver BER-35.
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { internalCallerKeys, readSecretKey, serviceKey } from './keys.ts';
+import { internalCallerKeys, internalCallHeaders, readSecretKey, serviceKey } from './keys.ts';
 
 const envFrom = (vars: Record<string, string>) => (name: string) => vars[name];
 
@@ -30,6 +30,22 @@ Deno.test('serviceKey: sem a secret key, cai na service_role legada; sem nenhuma
   assertEquals(serviceKey(envFrom({ SUPABASE_SERVICE_ROLE_KEY: 'eyJ.legado' })), 'eyJ.legado');
   assertEquals(serviceKey(envFrom({ SUPABASE_SERVICE_ROLE_KEY: '' })), undefined);
   assertEquals(serviceKey(envFrom({})), undefined);
+});
+
+Deno.test('internalCallHeaders: com a secret key, manda só o apikey — nada no Authorization', () => {
+  const env = envFrom({
+    SUPABASE_SECRET_KEYS: JSON.stringify({ default: 'sb_secret_x' }),
+    SUPABASE_SERVICE_ROLE_KEY: 'eyJ.legado',
+  });
+  assertEquals(internalCallHeaders(env), { apikey: 'sb_secret_x' });
+});
+
+Deno.test('internalCallHeaders: sem a secret key, cai na legada no Bearer; sem nenhuma, nada', () => {
+  assertEquals(internalCallHeaders(envFrom({ SUPABASE_SERVICE_ROLE_KEY: 'eyJ.legado' })), {
+    Authorization: 'Bearer eyJ.legado',
+  });
+  assertEquals(internalCallHeaders(envFrom({ SUPABASE_SECRET_KEYS: 'não é json' })), {});
+  assertEquals(internalCallHeaders(envFrom({})), {});
 });
 
 Deno.test('internalCallerKeys: a secret key nova e a service_role legada, nessa ordem', () => {

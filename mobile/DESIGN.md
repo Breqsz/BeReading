@@ -160,16 +160,21 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
 - **Skeleton**: placeholder de carregamento no formato exato do conteúdo final (card, linha,
   capa), nunca um spinner de tela cheia. Único estado: loading, com crossfade `motion.skeleton`
   (200 ms) para o conteúdo real ao terminar.
-- **EmptyState**: estante vazia, catálogo sem resultado, sem conquista ainda. Composição: texto
-  de voz (seção 7) e CTA opcional. Não é um erro; não usa `color.danger`.
+- **EmptyState**: estante vazia, catálogo sem resultado, sem conquista ainda, e (R3) estados de
+  tela cheia que não são vazio: erro de perfil, sucesso de checkout, estados do quiz. Composição:
+  ilustração (`'spines'` por padrão; `'none'`; ou elemento próprio, como o `Glyph`), texto de voz
+  (seção 7), ação primária e ação secundária opcionais (a secundária é `ghost`). Não é um erro;
+  não usa `color.danger`.
 - **Banner**: aviso no topo da tela (erro de rede preservando o que já carregou, aviso de
   reflexão fraca). Duas variantes, não três: `danger` (`color.dangerSoft`, texto `color.danger`) e
   `info` (`color.surface1`, texto `color.text2`). Sem dispensar automaticamente: some quando a
   causa é corrigida — e é justamente por isso que **não existe banner de sucesso**: sucesso não
   tem causa a corrigir, é transitório, e transitório é Toast.
 - **ListRow**: linha de lista com divisória (`color.line`), no lugar do card do sistema legado.
-  Estados: default; pressed (`color.surface3`) quando a linha é tocável; disabled. Sem sombra,
-  sem borda lateral de destaque (anti-pattern, seção 9).
+  Estados: default; pressed (`color.surface3`) quando a linha é tocável; disabled; loading
+  (indicador no lugar do `trailing`, `accessibilityState.busy`, sem novo toque). Tom
+  `destructive` pinta o título de `color.danger` (excluir conta, sair), sempre com
+  `confirmDestructive` antes da ação. Sem sombra, sem borda lateral de destaque (seção 9).
 - **Card** (F4): superfície de cartão isolado, `elevation.surface` (`color.surface1` + borda
   `color.line`, `radius.card`, `space.lg` de padding interno). Estados: default; pressed
   (`motion.press`) quando tocável (`onPress` opcional; com ele, `accessibilityLabel` é
@@ -182,6 +187,18 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
   `FullWindowOverlay` (react-native-screens), uma vez por toast: desenhado só na raiz do app, ele
   ficava atrás de sheet e modal nativos, que o iOS apresenta acima dela, e o erro com "Tentar" do
   sheet de registro não aparecia (F4-11).
+- **Sheet** (R3): folha inferior modal (convite ao Premium; na F6, o que hoje é modal legado).
+  `elevation.floating`, `radius.sheet` só nos cantos de cima, `space.gutter` nas laterais,
+  inset inferior real. Fundo `color.scrim`. Fecha por toque fora (o scrim é um botão "Fechar"
+  para leitor de tela), pelo voltar do Android e pela ação de quem usa. **Sem grabber**: esta
+  folha não arrasta, e puxador que não puxa é affordance falsa. Único primitivo além do `Screen`
+  que lê o inset, porque o `Modal` abre fora da árvore da tela. Sem `accessibilityViewIsModal`
+  no painel: o `Modal` já isola a tela de trás, e a marca escondia o scrim do leitor de tela.
+- **confirmDestructive** (R3): confirmação de ação que não se desfaz (sair, excluir conta, tirar
+  da leitura, cancelar assinatura), com o diálogo do sistema. É o único `Alert.alert` permitido em
+  `src/ui`. Rótulos no registro de voz: título em pergunta ("Excluir sua conta?"), mensagem que
+  diz o que se perde e o que fica, ação com o verbo ("Excluir conta"), cancelar com "Cancelar" ou
+  com a alternativa positiva ("Manter Premium").
 - **Screen**: casca de toda tela. Pinta `color.bg`, aplica o inset superior real do aparelho e
   reserva embaixo o espaço de `TAB_BAR_HEIGHT` mais o inset inferior, para que nenhum conteúdo
   role atrás da barra. Variação por `scroll` (rolável ou fixa) e por `tabBar` (telas fora das abas
@@ -224,6 +241,7 @@ criança, travessão em copy.
 |---|---|
 | saudação | "E aí, {nome}" |
 | sequência | "{n} dias seguidos. Lê hoje e vira {n+1}." |
+| sequência, já leu hoje | "{n} dias seguidos. Hoje já conta, amanhã vira {n+1}." |
 | sequência em risco | "Faltam {h}h pra sua sequência zerar. Uma página já conta." |
 | livro parado (F4) | "Faz {n} dias que você não abre o livro. Uma página já reata." |
 | capítulo fechado | "Capítulo {n}, fechado." / "Bora ver o que ficou?" |
@@ -231,6 +249,10 @@ criança, travessão em copy.
 | subiu de nível | "Nível {n}. Agora você é {título}." |
 | vazio | "Estante vazia, por enquanto. Escolhe o primeiro." |
 | sem rede | "Caiu a internet. O que você registrou tá salvo." |
+| limite atingido | título de `paywallCopy` + "Conhecer o Premium" / "Agora não" |
+| quiz do mês acabou | "{título}. Seus quizzes voltam em {data}." |
+| cancelar assinatura | "Cancelar assinatura?" / "Manter Premium" |
+| excluir conta | "Excluir sua conta?" / "Excluir conta" |
 
 **Títulos de nível:** 1 Primeira página, 2 Curioso, 3 Engatado, 4 Constante, 5 Maratonista,
 6 Devorador, 7 Rato de biblioteca, 8+ Lenda da estante.
@@ -289,8 +311,28 @@ Checklist de revisão. **(T)** marca o item coberto por teste automatizado na Ta
 - Borda lateral de destaque em card
 - Sombra em card de lista
 - Maiúsculas espaçadas como rótulo
-- Mascote, dragão, espada, coroa
+- Mascote, dragão, espada, coroa (T: coroa, `__tests__/guards/brand.test.ts`)
 - Mais de um acento por tela
 - Número inventado: toda métrica sai de dado persistido
 - Spinner de tela cheia: o carregamento usa skeleton no formato do conteúdo
 - Glow, neon, gradiente roxo, glass em tudo (blur só na tab bar, se usado)
+
+## 10. Premium e limite
+
+O plano gratuito limita quantidade (livros em leitura, capítulos com quiz por mês); o hábito
+(registro, sequência, conquistas) é igual nos dois planos. A interface trata isso assim:
+
+- **Premium não tem cor própria.** Sem coroa, sem dourado. Quando precisar marcar, `Tag` neutra
+  ou `accent` com "Premium". Preço em `numericL` com `color.text`. O âmbar continua sendo só a
+  ação primária da tela.
+- **Limite nunca aparece no anel nem no XP.** Nada de "XP bloqueado" nem nível travado: o limite
+  é de uso, não de progresso.
+- **Uso da cota é texto, nunca barra.** "1 de 2 livros em leitura", "3 de 4 quizzes este mês".
+  `ProgressBar` fica para progresso de leitura, e usá-la para cota gamifica o limite.
+- **Limite atingido é convite, não erro.** `PaywallSheet` (`Sheet` + copy de `paywallCopy`), sem
+  `color.danger`, sempre com "Agora não". Onde a ação principal da tela depende da cota (o quiz
+  na conquista), o CTA troca para "Conhecer o Premium" com a fala de quando a cota volta.
+- **"Premium" não entra em nome de componente nem de token.** O plano é produto; "premium" como
+  qualidade visual é o redesign inteiro, e misturar os dois confunde quem lê o código.
+- **A cobrança é simulada** (`billing-mock`, BER-79). A interface não afirma cobrança real que não
+  acontece, mas o aviso de demonstração no checkout é decisão do time (BER-61) e não se muda aqui.

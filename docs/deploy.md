@@ -136,6 +136,9 @@ testar a mesma cópia num Supabase local (passos 1 a 4 abaixo, trocando o destin
    gpg --decrypt --output bereading-db.tar.gz bereading-db-AAAAMMDD-HHMM.tar.gz.gpg
    tar -xzf bereading-db.tar.gz   # gera roles.sql, schema.sql e data.sql
    ```
+   **No Windows**, o `gpg` vem com o Git for Windows e só está no caminho do **Git Bash**. No
+   PowerShell, use o caminho completo:
+   `& "C:\Program Files\Git\usr\bin\gpg.exe" --decrypt --output ...`. O `tar` já vem com o Windows.
 3. Aponte para o banco de destino. Para testar localmente, use o banco de um `supabase start`
    num projeto **vazio** (sem migrations): `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
    Para produção, a URI do Session pooler.
@@ -146,7 +149,41 @@ testar a mesma cópia num Supabase local (passos 1 a 4 abaixo, trocando o destin
      -c 'SET session_replication_role = replica' \
      -f data.sql
    ```
-5. **Recrie os segredos do Vault e o agendamento do cron.** Nenhum dos dois está na cópia: o
+   **Sem `psql` instalado (teste local):** rode o `psql` de dentro do container do banco. O nome é
+   `supabase_db_<project_id do config.toml>`:
+   ```bash
+   docker exec supabase_db_<project_id> mkdir -p /tmp/restore
+   docker cp roles.sql supabase_db_<project_id>:/tmp/restore/   # idem schema.sql e data.sql
+   docker exec supabase_db_<project_id> psql -U postgres -d postgres --single-transaction \
+     -v ON_ERROR_STOP=1 -f /tmp/restore/roles.sql -f /tmp/restore/schema.sql \
+     -c 'SET session_replication_role = replica' -f /tmp/restore/data.sql
+   ```
+   **No Git Bash**, o `docker exec`/`docker cp` com caminhos `/tmp/...` precisa de
+   `MSYS_NO_PATHCONV=1`, e aí o caminho do arquivo no Windows tem que ir como `C:/Users/...`, não
+   `/c/Users/...`.
+5. **Recrie o trigger de cadastro.** O `schema.sql` exclui o schema `auth` inteiro, e com ele o
+   trigger `on_auth_user_created` em `auth.users`, o **único objeto do time** nos schemas `auth` e
+   `storage` (verificado em 15/09/2026). A função `public.handle_new_user` vem na cópia; o trigger
+   não. Sem ele, os dados restauram certos, mas **todo cadastro novo fica sem perfil** e o app quebra
+   para quem entrar depois da restauração.
+   ```sql
+   create trigger on_auth_user_created
+     after insert on auth.users
+     for each row execute function public.handle_new_user();
+   ```
+   Confira que funciona, sem deixar resto (a transação é desfeita no fim):
+   ```sql
+   begin;
+   insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
+                           email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+   values ('00000000-0000-4000-8000-00000000beef', '00000000-0000-0000-0000-000000000000',
+           'authenticated', 'authenticated', 'teste-restauracao@example.invalid', '', now(),
+           '{"display_name":"Teste Restauracao"}', now(), now());
+   select count(*) from public.profiles
+    where user_id = '00000000-0000-4000-8000-00000000beef';   -- esperado: 1
+   rollback;
+   ```
+6. **Recrie os segredos do Vault e o agendamento do cron.** Nenhum dos dois está na cópia: o
    `vault` fica de fora de propósito, e `cron.job` pertence a um papel de sistema que o `postgres`
    não pode escrever. No SQL Editor do projeto restaurado:
    ```sql
@@ -175,10 +212,19 @@ testar a mesma cópia num Supabase local (passos 1 a 4 abaixo, trocando o destin
    **Não use o bloco de cron da migration baseline** (`20260910210000_...`): ele ainda lê o
    segredo antigo `cron_service_role_key`, e o comando em produção foi alterado depois (BER-33).
    O SQL acima é o que roda em produção em 15/09/2026.
-6. Confira login de uma conta de teste, as contagens principais e, na hora cheia seguinte, uma
-   execução com sucesso do `retry-pending-quizzes` em `cron.job_run_details`.
-7. **Apague os arquivos descriptografados** (`.sql` e `.tar.gz`) da máquina. Eles têm dados
-   pessoais em claro.
+7. Confira:
+   - contagens principais (`auth.users`, `profiles`, `reading_sessions`, `answers`, `subscriptions`)
+     iguais às de produção no horário da cópia;
+   - nenhuma conta sem identidade (`auth.identities`) ou sem perfil (`public.profiles`);
+   - login de uma conta de teste;
+   - na hora cheia seguinte, uma execução com sucesso do `retry-pending-quizzes` em
+     `cron.job_run_details`.
+8. **Apague os arquivos descriptografados** (`.sql` e `.tar.gz`) da máquina. Eles têm dados
+   pessoais em claro. No teste local, pare o banco com `supabase stop --no-backup` para não deixar
+   os dados num volume do Docker.
+
+Último restore manual: **15/09/2026**, cópia `bereading-db-20260915-1120`, num Supabase local
+vazio. Todas as contagens bateram com produção; o trigger de cadastro precisou ser recriado (passo 5).
 
 ### Limites
 
@@ -189,6 +235,10 @@ testar a mesma cópia num Supabase local (passos 1 a 4 abaixo, trocando o destin
   enviado por leitores. Se o app passar a guardar arquivo de usuário, este backup não cobre.
 - **Fora da cópia, de propósito:** segredos do `vault`, o agendamento `cron.job`, o histórico
   `cron.job_run_details` e as tabelas vazias `storage.buckets_vectors` e `storage.vector_indexes`.
+- **Fora da cópia, por limitação do `db dump`:** o trigger `on_auth_user_created` em `auth.users`,
+  porque a exportação de estrutura exclui o schema `auth`. O passo 5 de "Restaurar" o recria, e o
+  workflow testa esse passo a cada execução. Se o time criar outro trigger, função ou policy nos
+  schemas `auth` ou `storage`, ele também fica de fora e precisa entrar no runbook e no workflow.
 - **Workflows agendados em repositório público são desligados pelo GitHub após 60 dias sem
   atividade no repositório.** Se o projeto ficar parado, confira se o Backup continua ativo
   em Actions.

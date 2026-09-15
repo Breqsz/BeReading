@@ -22,6 +22,8 @@ export interface RecordedCall {
   method: string;
   path: string;
   body: unknown;
+  /** Headers da requisição, com nomes em minúsculas — para provar com que credencial um dispatch saiu. */
+  headers: Record<string, string>;
 }
 
 export interface FakeSupabase {
@@ -152,7 +154,7 @@ export function startFakeSupabase(options: FakeSupabaseOptions = {}): FakeSupaba
     const method = req.method;
     const rawBody = method === 'GET' || method === 'DELETE' ? null : await req.text();
     const body = rawBody ? JSON.parse(rawBody) : null;
-    calls.push({ method, path: url.pathname + url.search, body });
+    calls.push({ method, path: url.pathname + url.search, body, headers: Object.fromEntries(req.headers) });
 
     if (url.pathname === '/auth/v1/user') {
       const auth = req.headers.get('authorization') ?? '';

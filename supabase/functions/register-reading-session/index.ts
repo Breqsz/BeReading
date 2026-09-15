@@ -2,6 +2,7 @@
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { authErrorResponse, resolveUserId } from '../_shared/auth.ts';
 import { dispatchBackground } from '../_shared/background.ts';
+import { internalCallHeaders } from '../_shared/keys.ts';
 import type { ReadingSessionPayload } from '../_shared/types.ts';
 import { loadEntitlement } from '../_shared/entitlement.ts';
 import { canStartBook, quotaExceededResponse } from '../_shared/plan-rules.ts';
@@ -208,7 +209,7 @@ export async function handler(req: Request): Promise<Response> {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              ...internalCallHeaders((name) => Deno.env.get(name)),
             },
             body: JSON.stringify({ chapter_id: ch.id }),
           }));
@@ -225,7 +226,7 @@ export async function handler(req: Request): Promise<Response> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          ...internalCallHeaders((name) => Deno.env.get(name)),
         },
         body: JSON.stringify({ user_id }),
       }));

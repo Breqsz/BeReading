@@ -12,6 +12,7 @@ function withEnv(url: string) {
   Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', SERVICE_KEY);
   Deno.env.delete('CRON_SECRET');
   Deno.env.delete('OPS_ALERT_WEBHOOK_URL');
+  Deno.env.delete('SUPABASE_SECRET_KEYS');
 }
 
 function request(): Request {
@@ -61,6 +62,38 @@ Deno.test({
       assertEquals(alerts.calls.length, 0);
     } finally {
       alerts.restore();
+      await fake.close();
+    }
+  },
+});
+
+Deno.test({
+  name: 'retry-pending-quizzes: re-tenta o quiz com a secret key no apikey, não no Authorization (BER-76)',
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const fake = startFakeSupabase({
+      tables: {
+        chapter_quiz_status: [{ chapter_id: 'ch-1', status: 'failed', attempts: 1, last_attempt_at: null }],
+        answers: [],
+      },
+    });
+    withEnv(fake.url);
+    Deno.env.set('SUPABASE_SECRET_KEYS', JSON.stringify({ default: 'sb_secret_teste' }));
+
+    try {
+      const { handler } = await import('./index.ts');
+      const res = await handler(request());
+      const json = await res.json();
+
+      assertEquals(res.status, 200);
+      assertEquals(json.data.retried, 1);
+      const retry = fake.calls.find((c) => c.path.startsWith('/functions/v1/generate-questions'));
+      assertEquals(retry?.body, { chapter_id: 'ch-1' });
+      assertEquals(retry?.headers.apikey, 'sb_secret_teste');
+      assertEquals(retry?.headers.authorization, undefined);
+    } finally {
+      Deno.env.delete('SUPABASE_SECRET_KEYS');
       await fake.close();
     }
   },

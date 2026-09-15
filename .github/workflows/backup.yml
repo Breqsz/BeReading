@@ -36,9 +36,10 @@ jobs:
           [ -n "$SUPABASE_DB_URL" ] || { echo "::error::secret SUPABASE_DB_URL ausente"; exit 1; }
           [ -n "$BACKUP_ENCRYPTION_KEY" ] || { echo "::error::secret BACKUP_ENCRYPTION_KEY ausente"; exit 1; }
 
+      # Mesma versão fixa do deploy.yml (BER-90); atualize os dois juntos.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       - name: Contagem em produção (antes da exportação)
         run: |

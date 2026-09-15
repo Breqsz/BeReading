@@ -7,11 +7,10 @@ import {
 } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import {
   assertInternalCaller,
-  assertServiceRole,
   AuthError,
   extractBearer,
   type GetUserFn,
-  isServiceRole,
+  isInternalCaller,
   resolveUserId,
 } from './auth.ts';
 
@@ -91,76 +90,61 @@ Deno.test('resolveUserId: 401 quando o getUser responde sem usuário', async () 
   assertEquals(err.status, 401);
 });
 
-// --- assertServiceRole (funções internas) ---
+// --- Chamador interno: isInternalCaller / assertInternalCaller (BER-30, BER-69, BER-76) ---
 
-Deno.test('assertServiceRole: aceita a service_role key', () => {
-  assertServiceRole('Bearer service-key-secreta', 'service-key-secreta');
+/** Headers de uma requisição, sem precisar montar um Request inteiro. */
+const headers = (values: Record<string, string>) => new Headers(values);
+
+const LEGACY_KEY = 'eyJ.service-role.legado';
+const SECRET_KEY = 'sb_secret_chave-nova';
+const SERVER_KEYS = [SECRET_KEY, LEGACY_KEY];
+
+Deno.test('isInternalCaller: aceita a service_role legada no Authorization Bearer', () => {
+  assertEquals(isInternalCaller(headers({ Authorization: `Bearer ${LEGACY_KEY}` }), SERVER_KEYS), true);
 });
 
-Deno.test('assertServiceRole: recusa a anon key', () => {
+Deno.test('isInternalCaller: aceita a secret key nova no header apikey (BER-76)', () => {
+  assertEquals(isInternalCaller(headers({ apikey: SECRET_KEY }), SERVER_KEYS), true);
+});
+
+Deno.test('isInternalCaller: a requisição do app não passa (publishable no apikey, JWT do usuário no Bearer)', () => {
+  const app = headers({ apikey: 'sb_publishable_do-app', Authorization: 'Bearer jwt.de.usuario' });
+  assertEquals(isInternalCaller(app, SERVER_KEYS), false);
+});
+
+Deno.test('isInternalCaller: recusa chave errada e headers ausentes', () => {
+  assertEquals(isInternalCaller(headers({ apikey: 'sb_secret_outra' }), SERVER_KEYS), false);
+  assertEquals(isInternalCaller(headers({ Authorization: 'Bearer outra-chave' }), SERVER_KEYS), false);
+  assertEquals(isInternalCaller(headers({}), SERVER_KEYS), false);
+});
+
+Deno.test('isInternalCaller: falha FECHADA — sem chave configurada, ninguém é interno', () => {
+  // Se a env sumir do deploy, o caminho interno não pode virar porta aberta. Um
+  // `apikey` vazio também não pode casar com um slot vazio da lista.
+  assertEquals(isInternalCaller(headers({ Authorization: 'Bearer qualquer' }), [undefined, '']), false);
+  assertEquals(isInternalCaller(headers({ apikey: '' }), ['', undefined]), false);
+  assertEquals(isInternalCaller(headers({ apikey: 'qualquer' }), []), false);
+});
+
+Deno.test('assertInternalCaller: aceita qualquer uma das chaves configuradas, em qualquer dos dois headers', () => {
+  const comCron = [...SERVER_KEYS, 'cron-secret'];
+  assertInternalCaller(headers({ Authorization: `Bearer ${LEGACY_KEY}` }), comCron);
+  assertInternalCaller(headers({ apikey: SECRET_KEY }), comCron);
+  assertInternalCaller(headers({ Authorization: 'Bearer cron-secret' }), comCron);
+});
+
+Deno.test('assertInternalCaller: recusa com 401 chave fora da lista', () => {
   const err = assertThrows(
-    () => assertServiceRole('Bearer anon-key', 'service-key-secreta'),
-    AuthError,
-  );
-  assertEquals(err.status, 401);
-});
-
-Deno.test('assertServiceRole: recusa header ausente', () => {
-  assertThrows(() => assertServiceRole(null, 'service-key-secreta'), AuthError);
-});
-
-Deno.test('assertServiceRole: falha FECHADA quando a env não está configurada', () => {
-  // Sem a chave no ambiente, ninguém entra — nunca o contrário.
-  assertThrows(() => assertServiceRole('Bearer qualquer', undefined), AuthError);
-  assertThrows(() => assertServiceRole('Bearer qualquer', ''), AuthError);
-});
-
-// --- BER-36: isServiceRole, o caminho alternativo do cron ---
-
-Deno.test('isServiceRole: reconhece a chave correta', () => {
-  assertEquals(isServiceRole('Bearer chave-secreta', 'chave-secreta'), true);
-});
-
-Deno.test('isServiceRole: recusa chave errada, header ausente e env ausente', () => {
-  assertEquals(isServiceRole('Bearer outra-chave', 'chave-secreta'), false);
-  assertEquals(isServiceRole(null, 'chave-secreta'), false);
-  assertEquals(isServiceRole('Bearer chave-secreta', null), false);
-  assertEquals(isServiceRole('Bearer chave-secreta', undefined), false);
-});
-
-Deno.test('isServiceRole: falha fechada — sem env configurada, ninguém é interno', () => {
-  // O caso que importa: se a env sumir do deploy, o caminho interno não pode
-  // virar uma porta aberta. Sem chave configurada, a resposta é sempre false.
-  assertEquals(isServiceRole('Bearer qualquer-coisa', ''), false);
-});
-
-Deno.test('isServiceRole: um JWT de usuário não passa por interno', () => {
-  assertEquals(isServiceRole('Bearer jwt.de.usuario', 'service-role-key'), false);
-});
-
-// --- BER-69 / BER-33: assertInternalCaller, mais de uma credencial interna ---
-
-Deno.test('assertInternalCaller: aceita qualquer uma das chaves configuradas', () => {
-  assertInternalCaller('Bearer service-key', ['service-key', 'cron-secret']);
-  assertInternalCaller('Bearer cron-secret', ['service-key', 'cron-secret']);
-});
-
-Deno.test('assertInternalCaller: recusa chave fora da lista', () => {
-  const err = assertThrows(
-    () => assertInternalCaller('Bearer anon-key', ['service-key', 'cron-secret']),
+    () => assertInternalCaller(headers({ Authorization: 'Bearer anon-key' }), SERVER_KEYS),
     AuthError,
   );
   assertEquals(err.status, 401);
 });
 
 Deno.test('assertInternalCaller: falha FECHADA quando nenhuma chave está configurada', () => {
-  // O CRON_SECRET é opcional no deploy: sem ele a lista vira [srk, undefined], e
+  // O CRON_SECRET é opcional no deploy, e a secret key nova pode ainda não existir:
   // um slot vazio nunca pode virar porta aberta.
-  assertThrows(() => assertInternalCaller('Bearer qualquer', [undefined, '']), AuthError);
-  assertThrows(() => assertInternalCaller('Bearer qualquer', [null]), AuthError);
-  assertThrows(() => assertInternalCaller('Bearer qualquer', []), AuthError);
-});
-
-Deno.test('assertInternalCaller: recusa header ausente mesmo com chaves configuradas', () => {
-  assertThrows(() => assertInternalCaller(null, ['service-key', 'cron-secret']), AuthError);
+  assertThrows(() => assertInternalCaller(headers({ Authorization: 'Bearer qualquer' }), [undefined, '']), AuthError);
+  assertThrows(() => assertInternalCaller(headers({ Authorization: 'Bearer qualquer' }), [null]), AuthError);
+  assertThrows(() => assertInternalCaller(headers({ Authorization: 'Bearer qualquer' }), []), AuthError);
 });

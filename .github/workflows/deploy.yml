@@ -36,9 +36,12 @@ jobs:
         with:
           ref: main
 
+      # BER-90: versão fixa. Com `latest`, a action consulta a API do GitHub sem
+      # autenticação para descobrir a versão, e o limite por IP dos runners
+      # compartilhados já derrubou um deploy. Como atualizar: docs/deploy.md.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # Proteção 1 — replay de TODAS as migrations (as existentes + a(s) nova(s)
       # deste push) num Postgres novo, do zero, ANTES de tocar em produção. Se

@@ -57,8 +57,12 @@ O app usa `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` em runtim
 
 ```bash
 eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value <url> --environment production
-eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <anon-key> --environment production
+eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <publishable-key> --environment production
 ```
+
+Apesar do nome da variável, o valor é a **publishable key** (`sb_publishable_…`), não a
+`anon` legada: as chaves legadas serão desativadas (BER-76), e um build com a `anon` para de
+funcionar nesse dia.
 
 Repita para `preview` se os ambientes de teste e produção usarem projetos Supabase
 diferentes.

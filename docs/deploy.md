@@ -39,6 +39,15 @@ correção é um novo PR (ou reimplantar a versão anterior manualmente).
   que depende de estado que só existe em produção quebra o deploy no passo 1.
 - **Secrets das functions** (`AI_PROVIDER`, `AI_API_KEY`, `ANTHROPIC_API_KEY` etc.) não são
   gerenciados pelo pipeline; continuam sendo definidos com `supabase secrets set`.
+- **A versão do Supabase CLI é fixa** (`version:` do `supabase/setup-cli` no `deploy.yml` e no
+  `backup.yml`, BER-90). Com `latest`, a action pergunta a versão à API do GitHub sem
+  autenticação e pode falhar por rate limit (ver [Troubleshooting](#failed-to-resolve-latest-supabase-cli-release-rate-limit-exceeded)).
+  Para atualizar:
+  1. Escolha uma versão estável em <https://github.com/supabase/cli/releases>, sem `-beta`.
+  2. Troque a versão **nos dois arquivos no mesmo PR**.
+  3. Depois do merge, confira o deploy. Rode também o **Backup** manualmente (Actions → Backup →
+     Run workflow): a restauração verificada é o que prova que a versão nova ainda restaura o
+     banco.
 
 ## Secrets do GitHub Actions
 
@@ -48,7 +57,7 @@ Settings → Secrets and variables → Actions:
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | deploy das Edge Functions | Dashboard → avatar → Access Tokens. Escopo: projeto BeReading, Full access |
 | `SUPABASE_DB_URL` | `db push` | Projeto → **Connect** → **Direct** → **Session pooler** (porta 5432), com a senha do banco |
-| `SUPABASE_ANON_KEY` | smoke test | Project Settings → API Keys |
+| `SUPABASE_ANON_KEY` | smoke test | Project Settings → API Keys → a **publishable key** (`sb_publishable_…`). Não use a `anon` legada, que será desativada (BER-76) |
 | `BACKUP_ENCRYPTION_KEY` | `backup.yml` (criptografia do backup) | Gerada pelo time; cópia obrigatória no gerenciador de senhas. Ver [Backup e restauração](#backup-e-restauração) |
 
 Ao gravar, evite espaço ou quebra de linha no final do valor. No PowerShell:
@@ -262,6 +271,14 @@ Para testar um token fora do pipeline:
 ```powershell
 Invoke-RestMethod -Uri "https://api.supabase.com/v1/projects/asfdkzejtuqcgqdcsnac" -Headers @{ Authorization = "Bearer $plain" }
 ```
+
+### `Failed to resolve latest Supabase CLI release: rate limit exceeded`
+
+O passo `supabase/setup-cli` foi configurado com `version: latest`. Nesse modo, a action consulta
+`api.github.com` sem autenticação, e o limite é por IP, compartilhado entre os runners do GitHub.
+Aconteceu no deploy do #39 (15/09/2026), antes de qualquer passo em produção. A correção
+permanente é manter a versão fixa (ver [Regras](#regras)). Se reaparecer num workflow que ainda
+use `latest`, basta rodar o job de novo.
 
 ### `password authentication failed for user "postgres"`
 

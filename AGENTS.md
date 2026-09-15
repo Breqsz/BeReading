@@ -53,6 +53,7 @@ baseline e não levar a culpa por vermelho alheio.
 ```bash
 # mobile
 cd mobile && npm ci
+npx expo customize tsconfig.json   # gera .expo/types/router.d.ts (tipos das rotas)
 npx tsc --noEmit
 npx jest --ci
 
@@ -71,25 +72,25 @@ deno test --allow-net --allow-env
 `deno test` 225 testes. Total 432. **Se algo estiver vermelho quando você
 começar, esse vermelho não é seu — investigue antes de mexer.**
 
-### Armadilha do type-check de rotas (verificada em 2026-09-15)
+### Rotas tipadas: gere os tipos antes do `tsc` (BER-89)
 
 `mobile/app.json` tem `experiments.typedRoutes: true`, mas o arquivo que dá
-sentido a isso — `mobile/.expo/types/router.d.ts` — é **gerado localmente e
-gitignored** (`mobile/.gitignore:7`). O CI faz checkout limpo, nunca gera esse
-arquivo, e o `tsc` cai num tipo permissivo.
+sentido a isso — `mobile/.expo/types/router.d.ts` — é **gerado e gitignored**
+(`mobile/.gitignore:7`). Sem ele, o `tsc` cai num tipo permissivo e aceita
+qualquer string de rota: medido em 2026-09-15, um `router.push('/rota-que-nao-existe')`
+dava 0 erros sem o arquivo e `TS2345` com ele.
 
-Consequência medida: com o `router.d.ts` presente e desatualizado, `tsc` dá
-**6 erros**; sem ele, **0**. Ou seja, **o CI hoje não verifica string de rota**
-— uma rota escrita errada passa verde e quebra em runtime.
+Desde a BER-89 o job `mobile` do `ci.yml` roda `npx expo customize tsconfig.json`
+antes do type-check. O comando gera os tipos sem subir o Metro (o arquivo sai
+idêntico ao do `npx expo start`) e não altera um `tsconfig.json` que já existe.
+Uma rota inexistente agora reprova o PR.
 
 Na prática:
-- `tsc` vermelho só em `TS2345 ... is not assignable to ... RelativePathString`
-  provavelmente é seu `router.d.ts` velho. Regenere (`npx expo start`, deixe o
-  Metro subir, encerre) e rode de novo.
+- Rode o mesmo comando antes do `tsc` local. Um `router.d.ts` velho (de antes de
+  alguém criar uma rota) dá `TS2345 ... is not assignable to ... RelativePathString`
+  em rotas que existem — foi o que produziu os 6 erros medidos antes da BER-89.
 - Não "conserte" esses erros com cast. Confirme primeiro se a rota existe em
   `mobile/app/`.
-- Fechar essa lacuna de verdade (gerar as rotas no CI) é trabalho pendente — não
-  há issue aberta que eu tenha confirmado.
 
 ---
 
@@ -99,8 +100,12 @@ Na prática:
    `resolveUserId(authHeader, bodyUserId, getUser)` de `_shared/auth.ts`; o
    `user_id` do corpo só serve para detectar divergência e recusar com 403. Foi
    o IDOR do BER-30. Função interna (cron, chamada entre functions) usa
-   `assertServiceRole` / `assertInternalCaller` — ambos **falham fechado** sem a
-   env configurada. Mantenha assim.
+   `assertInternalCaller` / `isInternalCaller` com as chaves de `_shared/keys.ts`
+   — **falham fechado** sem chave configurada. Mantenha assim. A secret key nova
+   (`sb_secret_…`, BER-76) só vale no header `apikey`; a service_role legada (JWT)
+   ainda vale no `Authorization` até as chaves legadas serem desativadas. Para uma
+   function chamar outra, monte os headers com `internalCallHeaders` — nunca leia
+   `SUPABASE_SERVICE_ROLE_KEY` direto.
 
 2. **O cliente pode mentir; valide no servidor.** `streaks`, `student_badges` e
    `answers` são **somente leitura** pela RLS (BER-28) — quem escreve são as

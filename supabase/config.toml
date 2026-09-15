@@ -395,7 +395,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 #
 # Regra: a autenticação mora no HANDLER (`_shared/auth.ts`), não no gateway.
 #   - chamada pelo app: `resolveUserId` valida o JWT do usuário no Auth;
-#   - chamada interna (outra function, pg_cron): `assertServiceRole` / `assertInternalCaller`.
+#   - chamada interna (outra function, pg_cron): `assertInternalCaller` / `isInternalCaller`.
 #
 # BER-69: `verify_jwt` fica false TAMBÉM nas funções do app. O projeto assina login
 # com ES256, e o gateway tem bug conhecido recusando ES256 válido com 401

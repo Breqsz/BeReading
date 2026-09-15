@@ -45,6 +45,34 @@ Deno.test('generate-questions: sem a service_role key devolve 401', async () => 
   }
 });
 
+Deno.test('generate-questions: aceita a secret key nova no header apikey e usa-a no banco (BER-76)', async () => {
+  const fake = startFakeSupabase({
+    tables: { questions: [{ id: 'q1', chapter_id: 'ch-1' }] },
+  });
+  withEnv(fake.url);
+  Deno.env.set('SUPABASE_SECRET_KEYS', JSON.stringify({ default: 'sb_secret_teste' }));
+
+  try {
+    const { handler } = await import('./index.ts');
+    const res = await handler(new Request('http://localhost/generate-questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: 'sb_secret_teste' },
+      body: JSON.stringify({ chapter_id: 'ch-1' }),
+    }));
+    const json = await res.json();
+
+    assertEquals(res.status, 200);
+    assertEquals(json.data.cached, true);
+
+    // Com a secret key configurada, uma chave errada continua sendo recusada.
+    const chaveErrada = await handler(request({ chapter_id: 'ch-1' }, 'sb_secret_errada'));
+    assertEquals(chaveErrada.status, 401);
+  } finally {
+    Deno.env.delete('SUPABASE_SECRET_KEYS');
+    await fake.close();
+  }
+});
+
 Deno.test('generate-questions: perguntas já existem — devolve cached=true sem chamar a IA', async () => {
   const fake = startFakeSupabase({
     tables: { questions: [{ id: 'q1', chapter_id: 'ch-1' }] },

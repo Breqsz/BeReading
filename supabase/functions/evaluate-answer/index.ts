@@ -1,6 +1,7 @@
 // supabase/functions/evaluate-answer/index.ts
 import { createServiceClient } from '../_shared/supabase-client.ts';
-import { authErrorResponse, isServiceRole, resolveUserId } from '../_shared/auth.ts';
+import { authErrorResponse, isInternalCaller, resolveUserId } from '../_shared/auth.ts';
+import { internalCallerKeys } from '../_shared/keys.ts';
 import { hasReachedChapterEnd } from '../_shared/progress.ts';
 import { notifyOps } from '../_shared/ops-alert.ts';
 import { existingAnswerResult, isUniqueViolation, PENDING_FEEDBACK } from './submission.ts';
@@ -218,7 +219,7 @@ export async function handler(req: Request): Promise<Response> {
   // retry-pending-quizzes/index.ts) — com o guard depois, todo request do cron
   // caía 400 sem nunca chegar em `handleReevaluation`. O retry da BER-36 nunca
   // tinha reavaliado uma resposta sequer.
-  if (isServiceRole(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))) {
+  if (isInternalCaller(req.headers, internalCallerKeys((name) => Deno.env.get(name)))) {
     return await handleReevaluation(supabase, payload.answer_id);
   }
 

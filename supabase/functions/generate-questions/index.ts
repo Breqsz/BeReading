@@ -1,6 +1,7 @@
 // supabase/functions/generate-questions/index.ts
 import { createServiceClient } from '../_shared/supabase-client.ts';
-import { assertServiceRole, authErrorResponse } from '../_shared/auth.ts';
+import { assertInternalCaller, authErrorResponse } from '../_shared/auth.ts';
+import { internalCallerKeys } from '../_shared/keys.ts';
 import { parseQuestions } from '../_shared/ai-json.ts';
 // BER-35: o prompt vive em módulo próprio para que o teste exercite o código real.
 // BER-65: sem `grade` — o público é leitor adulto, não turma do fundamental.
@@ -103,9 +104,9 @@ export async function handler(req: Request): Promise<Response> {
   // Função interna (BER-30 / BER-46): chamada por register-reading-session e pelo
   // cron de retry. Endpoint público aqui é abuso de custo de IA por chamada.
   try {
-    assertServiceRole(
-      req.headers.get('Authorization'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    assertInternalCaller(
+      req.headers,
+      internalCallerKeys((name) => Deno.env.get(name)),
     );
   } catch (err) {
     return authErrorResponse(err);

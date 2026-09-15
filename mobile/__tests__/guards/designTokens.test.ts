@@ -72,7 +72,6 @@ const EXCECAO_COR = new Set([
   'app/(tabs)/catalogo.tsx',
   'app/(tabs)/livros.tsx',
   'app/(tabs)/perfil.tsx',
-  'app/book/[id].tsx',
   // Telas do time que chegaram no merge do main de 15/09 (PR #27, BER-58/61),
   // escritas no sistema antigo. Divida declarada: migram na F6.
   'app/checkout.tsx',
@@ -98,7 +97,6 @@ const EXCECAO_FEEDBACK = new Set([
   // conta, tirar da leitura, cancelar assinatura) e o fluxo de planos. Saem
   // quando a R3 trouxer a confirmacao destrutiva do sistema e a F6 migrar as telas.
   'app/(tabs)/perfil.tsx',
-  'app/book/[id].tsx',
   'app/checkout.tsx',
   'app/planos.tsx',
 ]);

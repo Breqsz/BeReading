@@ -80,6 +80,9 @@ export function Screen({
     <ScrollView
       testID="screen-scroll"
       showsVerticalScrollIndicator={false}
+      // Com teclado aberto (busca, login), o primeiro toque num botao tem que
+      // acionar o botao, nao so fechar o teclado.
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={[
         styles.content,
         { paddingBottom: reservaInferior },

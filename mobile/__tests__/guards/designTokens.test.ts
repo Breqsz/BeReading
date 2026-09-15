@@ -68,7 +68,6 @@ const EXCECOES_COR = new Set([
  * tinha cor, fontSize ou Alert.alert literal de verdade.
  */
 const EXCECAO_COR = new Set([
-  'app/(auth)/confirm-email.tsx',
   // Telas do time que chegaram no merge do main de 15/09 (PR #27, BER-58/61),
   // escritas no sistema antigo. Divida declarada: migram na F6.
   'app/checkout.tsx',
@@ -80,15 +79,12 @@ const EXCECAO_COR = new Set([
  * login.tsx e signup.tsx nao tem cor literal, mas tem fontSize/fontFamily
  * solto.
  */
-const EXCECAO_TIPOGRAFIA = new Set([...EXCECAO_COR, 'app/(auth)/login.tsx', 'app/(auth)/signup.tsx']);
+const EXCECAO_TIPOGRAFIA = new Set([...EXCECAO_COR]);
 
 const EXCECAO_FEEDBACK = new Set([
   // Permanente: o dialogo do sistema para confirmacao destrutiva (spec secao 8).
   // O tripwire continua valendo: se o arquivo parar de usar Alert.alert, sai.
   'src/ui/confirmDestructive.ts',
-  'app/(auth)/confirm-email.tsx',
-  'app/(auth)/login.tsx',
-  'app/(auth)/signup.tsx',
   // Merge do main de 15/09: confirmacoes destrutivas do time (sair, excluir
   // conta, tirar da leitura, cancelar assinatura) e o fluxo de planos. Saem
   // quando a R3 trouxer a confirmacao destrutiva do sistema e a F6 migrar as telas.

@@ -44,7 +44,6 @@ const EXCECAO_EMOJI = new Set([
 ]);
 
 const EXCECAO_TRAVESSAO = new Set([
-  'app/(auth)/login.tsx',
   // Telas do time do merge do main de 15/09 (PR #27). Migram na F6.
   'app/checkout.tsx',
   'app/planos.tsx',

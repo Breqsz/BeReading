@@ -40,13 +40,13 @@ const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types
  * tem Pressable sem accessibilityRole/accessibilityLabel — ver
  * designTokens.test.ts pro raciocinio completo da mudanca.
  */
-const EXCECAO_A11Y = new Set([
-  'app/(auth)/confirm-email.tsx',
-  'app/(auth)/signup.tsx',
+const EXCECAO_A11Y = new Set<string>([
   // app/book/[id].tsx saiu no merge do main de 15/09: o PR #17 (BER-48) deu
   // role e label aos Pressable dos capitulos, e o tripwire acusou.
   // app/quiz/[chapterId].tsx saiu na F5: a rota passou a compor so primitivos
   // do sistema (QuizConversation, AssistantStateView), com role e label.
+  // confirm-email, signup, catalogo e perfil sairam na F6: a lista esta vazia,
+  // e as checagens abaixo continuam valendo para quem entrar nela de novo.
 ]);
 
 function arquivos(dir: string): string[] {
@@ -89,8 +89,11 @@ describe('guarda: acessibilidade', () => {
  * tela que ja migrou ou sumiu (lixo que finge cobertura).
  */
 describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
-  it.each([...EXCECAO_A11Y])('excecao %s ainda existe', (rel) => {
-    expect(existsSync(join(RAIZ, rel))).toBe(true);
+  // Laco num teste so, e nao it.each: com a lista vazia, it.each([]) falha.
+  it('toda excecao ainda existe', () => {
+    for (const rel of EXCECAO_A11Y) {
+      expect(existsSync(join(RAIZ, rel))).toBe(true);
+    }
   });
 });
 
@@ -102,15 +105,17 @@ describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
  * — o mesmo mecanismo que ja falhou nesta branch.
  */
 describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', () => {
-  it.each([...EXCECAO_A11Y])('%s: tripwire EXCECAO_A11Y ainda tem Pressable sem role/label', (rel) => {
-    const conteudo = readFileSync(join(RAIZ, rel), 'utf8');
-    const temPressable = /<Pressable|AnimatedPressable/.test(conteudo);
-    const temRole = /accessibilityRole=/.test(conteudo);
-    const temLabel = /accessibilityLabel[=:]/.test(conteudo);
-    if (!(temPressable && !(temRole && temLabel))) {
-      throw new Error(
-        `${rel} nao tem mais Pressable sem accessibilityRole/accessibilityLabel. Remova esta linha de EXCECAO_A11Y em a11y.test.ts: a excecao parou de proteger qualquer coisa.`,
-      );
+  it('tripwire: cada excecao de EXCECAO_A11Y ainda tem Pressable sem role/label', () => {
+    for (const rel of EXCECAO_A11Y) {
+      const conteudo = readFileSync(join(RAIZ, rel), 'utf8');
+      const temPressable = /<Pressable|AnimatedPressable/.test(conteudo);
+      const temRole = /accessibilityRole=/.test(conteudo);
+      const temLabel = /accessibilityLabel[=:]/.test(conteudo);
+      if (!(temPressable && !(temRole && temLabel))) {
+        throw new Error(
+          `${rel} nao tem mais Pressable sem accessibilityRole/accessibilityLabel. Remova esta linha de EXCECAO_A11Y em a11y.test.ts: a excecao parou de proteger qualquer coisa.`,
+        );
+      }
     }
   });
 });

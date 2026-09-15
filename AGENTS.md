@@ -5,7 +5,7 @@ Para quem vai **editar** este repositório: pessoa nova no time ou agente de IA
 que o projeto é e como rodar; `docs/deploy.md` explica como as coisas vão ao ar.
 **Este arquivo é sobre como não quebrar produção.**
 
-> Verificado contra `main` em 2026-09-15. Quando uma afirmação daqui deixar de
+> Verificado contra `main` @ `4f0f083` em 2026-09-15. Quando uma afirmação daqui deixar de
 > valer, corrija-a no mesmo PR que a invalidou — um documento que mente é pior
 > que documento nenhum. Este repositório já perdeu três meses por confiar num
 > estado que não existia mais (BER-27).
@@ -63,9 +63,9 @@ deno check register-reading-session/index.ts evaluate-answer/index.ts \
 deno test --allow-net --allow-env
 ```
 
-**Baseline medido em 2026-09-15 no `main` (`0ae4e5b`):** tudo verde —
+**Baseline medido em 2026-09-15 no `main` (`4f0f083`):** tudo verde —
 `tsc` sem erros, `jest` 27 suítes / 207 testes, `deno check` limpo,
-`deno test` 224 testes. Total 431. **Se algo estiver vermelho quando você
+`deno test` 225 testes. Total 432. **Se algo estiver vermelho quando você
 começar, esse vermelho não é seu — investigue antes de mexer.**
 
 ### Armadilha do type-check de rotas (verificada em 2026-09-15)
@@ -138,9 +138,13 @@ Na prática:
 
 8. **A cobrança é simulada — trate `Premium` como não confiável.** O
    `billing-mock` assina e cancela sem cobrar, gravando `provider='mock'` em
-   `subscriptions`; enquanto `BILLING_MODE=mock`, **qualquer usuário logado
-   consegue virar Premium** (README §Planos; a troca pela compra real é a
-   BER-79). Não construa nada que assuma que assinatura significa pagamento.
+   `subscriptions`; enquanto ele estiver ligado, **qualquer usuário logado
+   consegue virar Premium** (README §Planos; a compra real é a BER-79). Não
+   construa nada que assuma que assinatura significa pagamento. O mock **só liga
+   com o secret `BILLING_MODE=mock`** — sem o secret, ou com outro valor, a
+   function recusa tudo (BER-85). Esse padrão *fail-closed* é a regra da casa
+   para qualquer atalho de desenvolvimento: ausência de configuração nunca pode
+   significar "modo permissivo ligado".
 
 9. **Editar uma Edge Function não a coloca no ar — o merge em `main` coloca.**
    `deploy.yml` dispara depois que o CI fica verde no `main`. Não implante da
@@ -167,7 +171,7 @@ Na prática:
   irmão com nome de domínio — `prompt.ts`, `submission.ts`, `claim.ts`,
   `reading.ts`, `filter.ts`. O `handler.test.ts` faz `await import('./index.ts')`
   e exercita o `handler` de verdade contra o `fakeSupabase`. No app, a regra sai
-  da tela para `src/utils/`. É o que torna os 431 testes possíveis.
+  da tela para `src/utils/`. É o que torna os 432 testes possíveis.
 - **Branch:** `tipo/ber-XX-descricao` (`feat`, `fix`, `docs`, `chore`, `refactor`,
   `test`, `ci`). Trunk-based em `main`, PR pequeno.
 - **PR:** preencha `.github/pull_request_template.md` — resumo, issue do Linear,

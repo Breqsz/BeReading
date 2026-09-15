@@ -6,7 +6,8 @@
 // em `subscriptions` exatamente o que a integração real vai gravar, só que com
 // `provider = 'mock'` — o resto do sistema (limites, app) não distingue os dois.
 //
-// Só liga com `BILLING_MODE=mock`; sem o secret ou com outro valor, recusa tudo.
+// Só liga com `BILLING_MODE=mock`; sem o secret ou com outro valor, recusa tudo (BER-85:
+// ausência de configuração nunca pode significar cobrança simulada ligada).
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { authErrorResponse, resolveUserId } from '../_shared/auth.ts';
 import { loadEntitlement, loadSubscription, toEntitlementView } from '../_shared/entitlement.ts';

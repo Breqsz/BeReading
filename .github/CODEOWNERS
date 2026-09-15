@@ -1,0 +1,4 @@
+# Todo PR pede revisão automaticamente a todo o time (quem abriu o PR fica de fora),
+# e cada um recebe o aviso por email. A revisão continua opcional: só vira obrigatória
+# se "Require review from Code Owners" for ligado na proteção do main.
+* @ph-tavares @santos-nikolas @Breqsz @Rodrigo-Brasileiro @ThiagoJO0705

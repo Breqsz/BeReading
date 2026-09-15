@@ -9,15 +9,33 @@ const SAOPAULO_OFFSET = -3; // UTC-3
 
 /** Data de hoje (YYYY-MM-DD) no fuso de São Paulo. */
 export function getTodayInSaoPaulo(now: Date = new Date()): string {
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const sp = new Date(utc + SAOPAULO_OFFSET * 3600000);
+  // BER-78: now.getTime() já é um instante absoluto (epoch), independente de
+  // fuso. Somar now.getTimezoneOffset() reintroduzia o fuso da máquina que
+  // roda o processo, cancelando o SAOPAULO_OFFSET quando a máquina já está em
+  // UTC-3 e fazendo a conta errar em qualquer outro fuso.
+  const sp = new Date(now.getTime() + SAOPAULO_OFFSET * 3600000);
   return sp.toISOString().split('T')[0];
 }
 
-/** Página mais alta já alcançada nas sessões anteriores. */
-export function getMaxPageReached(sessions: { end_page: number }[]): number {
-  if (sessions.length === 0) return 0;
-  return Math.max(...sessions.map(s => s.end_page));
+// Página mais alta já alcançada nas sessões anteriores. Mora em _shared desde a
+// BER-48: a trava do quiz no evaluate-answer usa a mesma regra.
+export { getMaxPageReached } from '../_shared/progress.ts';
+
+/**
+ * Quantas páginas desta sessão são NOVAS (nunca contadas antes) — BER-68.
+ *
+ * `pages_read` era coluna gerada (`end_page - start_page + 1`): reler um
+ * trecho já registrado somava as mesmas páginas de novo no XP e nas medalhas.
+ * Esta é a conta que falta gravar: o intervalo [start_page, end_page] menos a
+ * parte que já ficava coberta pela maior página já alcançada antes desta
+ * sessão. Reler é legítimo (o aluno pode reler); contar duas vezes não.
+ */
+export function computeNewPagesRead(
+  startPage: number,
+  endPage: number,
+  previousMaxPage: number,
+): number {
+  return Math.max(0, endPage - Math.max(startPage - 1, previousMaxPage));
 }
 
 /** Capítulos que passaram de "não completo" para "completo" com esta sessão. */

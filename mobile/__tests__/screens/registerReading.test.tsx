@@ -10,12 +10,13 @@ jest.mock('react-native-reanimated', () => {
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 let mockParams: { bookId?: string } = {};
 // Opcoes que a tela passa para a propria rota via <Stack.Screen options>, na
 // ordem de render: a ultima e a que vale.
 const mockStackOptions: { gestureEnabled?: boolean }[] = [];
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, back: mockBack, push: jest.fn() }),
+  useRouter: () => ({ replace: mockReplace, back: mockBack, push: mockPush }),
   useLocalSearchParams: () => mockParams,
   Stack: {
     Screen: ({ options }: { options?: { gestureEnabled?: boolean } }) => {
@@ -65,6 +66,7 @@ import { useProgressStore } from '../../src/stores/progressStore';
 import { getStudentBooks, getBookWithChapters } from '../../src/api/queries';
 import { registerReadingSession } from '../../src/api/edgeFunctions';
 import type { RegisterReadingResponse } from '../../src/api/edgeFunctions';
+import { QuotaExceededError } from '../../src/utils/billing';
 import { color } from '../../src/theme/tokens';
 import type { Book, Chapter, StudentBook } from '../../src/types/database';
 
@@ -224,7 +226,9 @@ describe('registrar leitura: resumo ao vivo', () => {
     const nota = getByTestId('nota-repetidas');
     expect(StyleSheet.flatten(nota.props.style).backgroundColor).toBe(color.accentSoft);
     expect(
-      within(nota).getByText('5 páginas desse trecho você já tinha registrado. Seu progresso tá na pág. 84.'),
+      within(nota).getByText(
+        '5 páginas desse trecho você já tinha registrado, e elas não contam XP de novo. Seu progresso tá na pág. 84.',
+      ),
     ).toBeTruthy();
     expect(mRegister).not.toHaveBeenCalled();
   });
@@ -314,6 +318,39 @@ describe('registrar leitura: resultado', () => {
     const { params } = mockReplace.mock.calls[0][0];
     expect(params).not.toHaveProperty('xpBefore');
     expect(params).toEqual({ chapterIds: 'c-4', bookId: 'b1', pagesRead: '28', streak: '5' });
+  });
+
+  it('BER-68: com paginas relidas, o pagesRead leva so as novas, que sao as que contam XP', async () => {
+    mRegister.mockResolvedValue(resposta({ completed_chapter_ids: ['c-4'] }));
+
+    const { getByLabelText, getByRole } = await abrir();
+    // Parou na 84: de 80 a 112 sao 33 paginas, 5 relidas (80 a 84) e 28 novas.
+    fireEvent.changeText(getByLabelText('Página inicial'), '80');
+    fireEvent.changeText(getByLabelText('Página final'), '112');
+    fireEvent.press(getByRole('button', { name: 'Registrar 33 páginas' }));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalled());
+    expect(mockReplace.mock.calls[0][0].params.pagesRead).toBe('28');
+  });
+
+  it('BER-58: 402 de livros em leitura vira convite ao Premium, sem "Tentar" e com os campos intactos', async () => {
+    mRegister.mockRejectedValue(
+      new QuotaExceededError({ reason: 'active_books', limit: 2, used: 2, resets_at: null }),
+    );
+
+    const { getByLabelText, getByRole, findByText, queryByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '96');
+    fireEvent.press(getByRole('button', { name: 'Registrar 12 páginas' }));
+
+    expect(await findByText('Você já está lendo 2 livros')).toBeTruthy();
+    expect(queryByText('Tentar')).toBeNull();
+    expect(queryByText('Não deu pra registrar sua leitura.')).toBeNull();
+    expect(getByLabelText('Página final').props.value).toBe('96');
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+
+    fireEvent.press(getByRole('button', { name: /Conhecer o Premium/ }));
+    expect(mockPush).toHaveBeenCalledWith('/planos');
   });
 
   it('sem capitulo fechado: espera o refresh, fecha o sheet e mostra toast com paginas, XP e sequencia', async () => {

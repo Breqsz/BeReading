@@ -18,6 +18,7 @@ import { useProgressStore } from '../src/stores/progressStore';
 import { registerReadingSession, type RegisterReadingResponse } from '../src/api/edgeFunctions';
 import { getBookWithChapters, getStudentBooks } from '../src/api/queries';
 import { pickInitialBook, toChoices, type BookChoice } from '../src/utils/registerReading';
+import { isQuotaExceededError, paywallCopy } from '../src/utils/billing';
 import { Banner, Button, EmptyState, Screen, Text, useToast } from '../src/ui';
 import { space } from '../src/theme/tokens';
 import {
@@ -158,7 +159,7 @@ export default function RegisterReadingScreen() {
     // (keyboardShouldPersistTaps). Aberto, o teclado numerico cobre o toast de
     // erro, que fica perto do fundo da tela.
     Keyboard.dismiss();
-    const { start: de, end: ate, pages } = resumo;
+    const { start: de, end: ate, pages, newPages } = resumo;
     const livro = selected.book.id;
 
     // F4-7: o XP de antes e lido ANTES do envio, e so vale com o store ja
@@ -173,8 +174,27 @@ export default function RegisterReadingScreen() {
     let resposta: RegisterReadingResponse;
     try {
       resposta = await registerReadingSession(userId, livro, de, ate);
-    } catch {
+    } catch (erro: unknown) {
       vibrar(Haptics.NotificationFeedbackType.Error);
+      // BER-58: 402 de livros em leitura (livro fora da lista ou tirado dela).
+      // Nao e falha, e o convite ao Premium, com a copy de paywallCopy, a mesma
+      // do resto do app. Reenviar nao resolve, entao a acao leva aos planos em
+      // vez de "Tentar". Toast ate a R3 trazer o Sheet do sistema.
+      if (isQuotaExceededError(erro)) {
+        const convite = paywallCopy(erro.quota);
+        if (montado.current) {
+          enviando.current = false;
+          setSending(false);
+        }
+        toast.show({
+          message: convite.title,
+          detail: convite.description,
+          tone: 'info',
+          actionLabel: 'Conhecer o Premium',
+          onAction: () => router.push('/planos'),
+        });
+        return;
+      }
       if (!montado.current) {
         // A tela saiu no meio do envio: nao ha campo guardado nem o que tentar
         // de novo daqui. Avisa o erro sem prometer nenhum dos dois.
@@ -208,7 +228,7 @@ export default function RegisterReadingScreen() {
       // carga no proximo foco. Travar o leitor aqui nao ganha nada.
     }
 
-    const confirmacao = { ...successToast(pages, resposta.current_streak), tone: 'positive' as const };
+    const confirmacao = { ...successToast(pages, resposta.current_streak, newPages), tone: 'positive' as const };
 
     // F4-18: o haptic de sucesso vem logo antes de sair. Vibrando antes do
     // refresh, a pessoa sentia "pronto" e arrastava o sheet para baixo.
@@ -231,8 +251,7 @@ export default function RegisterReadingScreen() {
         params: chapterCompleteParams({
           completedChapterIds: resposta.completed_chapter_ids,
           bookId: livro,
-          start: de,
-          end: ate,
+          newPages,
           streak: resposta.current_streak,
           xpBefore,
         }),

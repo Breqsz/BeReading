@@ -16,7 +16,7 @@
 
 Valem para toda tarefa deste plano.
 
-- **Branch:** `feature/premium-ui-redesign`, no worktree `C:\Users\guiro\bereading-redesign`. Todos os comandos rodam de `C:\Users\guiro\bereading-redesign\mobile`.
+- **Branch:** `feature/premium-ui-redesign`. Todos os comandos rodam de `mobile/`.
 - **Sem push e sem PR.** Commits locais apenas. Push só com pedido explícito do Breq.
 - **Nenhuma alteração em `supabase/`**, em migrations, na API ou em regra de negócio.
 - **Nenhuma tela (`app/**`) muda nesta fase**, exceto `app/_layout.tsx` na Tarefa 3 (fontes e splash).

@@ -3,16 +3,21 @@ import { createServiceClient } from '../_shared/supabase-client.ts';
 import { authErrorResponse, resolveUserId } from '../_shared/auth.ts';
 import { dispatchBackground } from '../_shared/background.ts';
 import type { ReadingSessionPayload } from '../_shared/types.ts';
+import { loadEntitlement } from '../_shared/entitlement.ts';
+import { canStartBook, quotaExceededResponse } from '../_shared/plan-rules.ts';
 // BER-35: a lógica pura vive em `reading.ts` para que o teste exercite o código
 // real. Antes ficava aqui dentro, sem export, e o teste testava cópias suas.
 import {
+  computeNewPagesRead,
   findNewlyCompletedChapters,
   getMaxPageReached,
   getTodayInSaoPaulo,
   nextStreak,
 } from './reading.ts';
 
-Deno.serve(async (req) => {
+// BER-49: exportada para que o teste de handler chame o código real, não uma
+// cópia — o mesmo raciocínio da BER-35 para a lógica pura.
+export async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -83,6 +88,30 @@ Deno.serve(async (req) => {
     });
   }
 
+  // BER-58: registrar leitura de um livro fora da estante (ou tirado da leitura)
+  // coloca o livro em leitura no upsert do passo 4. Sem esta checagem, era um
+  // atalho em volta do limite de livros simultâneos que `reading-list` aplica.
+  const { data: studentBookRows } = await supabase
+    .from('student_books')
+    .select('status')
+    .eq('user_id', user_id)
+    .eq('book_id', book_id)
+    .limit(1);
+  const currentStatus = (studentBookRows?.[0] as { status: string } | undefined)?.status;
+
+  if (!currentStatus || currentStatus === 'dropped') {
+    const entitlement = await loadEntitlement(supabase, user_id);
+    const quota = canStartBook({
+      premium: entitlement.premium,
+      limits: entitlement.limits,
+      bookId: book_id,
+      activeBookIds: entitlement.activeBookIds,
+    });
+    if (!quota.allowed) {
+      return quotaExceededResponse('active_books', quota, null);
+    }
+  }
+
   // 2. Buscar sessões anteriores para calcular progresso
   const { data: prevSessions } = await supabase
     .from('reading_sessions')
@@ -93,9 +122,13 @@ Deno.serve(async (req) => {
   const previousMaxPage = getMaxPageReached(prevSessions ?? []);
 
   // 3. Criar ReadingSession
+  // BER-68: pages_read deixou de ser coluna gerada — grava só as páginas
+  // novas desta sessão, não o intervalo bruto. Reler é legítimo; contar duas
+  // vezes no XP e nas medalhas não.
+  const pagesRead = computeNewPagesRead(start_page, end_page, previousMaxPage);
   const { error: sessionError } = await supabase
     .from('reading_sessions')
-    .insert({ user_id, book_id, start_page, end_page });
+    .insert({ user_id, book_id, start_page, end_page, pages_read: pagesRead });
 
   if (sessionError) {
     return new Response(JSON.stringify({ error: 'Failed to create session' }), {
@@ -210,4 +243,8 @@ Deno.serve(async (req) => {
   }), {
     headers: { 'Content-Type': 'application/json' }
   });
-});
+}
+
+// BER-49: só sobe o listener quando este arquivo é o entrypoint (deploy real).
+// Um teste que importa `handler` não pode abrir uma porta de verdade.
+if (import.meta.main) Deno.serve(handler);

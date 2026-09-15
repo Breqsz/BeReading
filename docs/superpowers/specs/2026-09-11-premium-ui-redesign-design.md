@@ -1,6 +1,6 @@
 # Redesign premium da interface: design
 
-- **Branch:** `feature/premium-ui-redesign` (base `fd3fb9b`, worktree `C:\Users\guiro\bereading-redesign`)
+- **Branch:** `feature/premium-ui-redesign` (base `fd3fb9b`; integra o `main` em 15/09, ver o adendo no fim)
 - **Issue:** BER-77 · relacionadas: BER-48 (PR #12), BER-72, BER-54, BER-42, BER-45, BER-51
 - **Data:** 2026-09-11 · **Status:** aprovado no brainstorming; aguarda revisão desta spec
 - **Mockups aprovados:** `docs/superpowers/specs/2026-09-11-premium-ui-redesign-mockups/` (abrir no navegador)
@@ -228,7 +228,9 @@ floor, next, progress }`. As constantes ficam em um lugar só, para ajustar o ri
 - **Nova** `chapter-complete`: tela cheia de conquista. Params: `chapterIds`, `bookId`,
   `pagesRead`, `streak`, `xpBefore`.
 - `quiz/[chapterId]` e `quiz/summary`: modal de tela cheia (`fullScreenModal`), sem tab bar.
-- `reading-success`: continua registrada e redireciona para `/` (link antigo não quebra).
+- `reading-success`: ~~continua registrada e redireciona para `/`~~. **Corrigido em 15/09:** a rota
+  foi apagada na F4 (`c23fe5f`), junto com a chegada do toast de confirmação no sheet. Nada no app
+  navega mais para ela; ver o adendo no fim.
 - O guard de auth do `app/_layout.tsx` fica **idêntico**. Muda só o splash (`expo-splash-screen`
   segura até as fontes carregarem, no lugar do `return null`).
 
@@ -449,7 +451,7 @@ uso, o Expo Go quebra por versão diferente entre o JS e o nativo. **É a primei
 | F2 Fundação | worklets 0.5.1 · tokens · fontes · `DESIGN.md` · `src/ui` · `src/game` · `src/assistant` · toast · guardas | testes unitários e de componente verdes; guardas rodando |
 | F3 Navegação | `TabBar`, apresentações (sheet/modal), `Screen`, ícone e splash | abas e rotas navegam no emulador |
 | F4 Loop central | Hoje · sheet de registro · capítulo fechado | loop completo no emulador com login real |
-| ↻ | **rebase no `main` com a BER-48 (PR #12)** | branch sobre o main atualizado, testes verdes |
+| ↻ | ~~rebase no `main` com a BER-48 (PR #12)~~ **merge do `main` em 15/09** (a BER-48 entrou pelos PRs #16/#17) | branch com o main integrado, testes verdes |
 | F5 Fluxos | detalhe do livro · quiz em conversa · resumo | quiz completo no emulador, todos os estados vistos |
 | F6 Secundárias | Estante · Explorar · Você · auth · estados de erro | todas as telas no sistema novo |
 | F7 Motion | passada de motion e haptics, reduce motion | checklist de motion ok |
@@ -477,3 +479,31 @@ com pedido explícito.** Linear: BER-77 atualizada a cada fase.
 - **Textos de medalha do seed** com linguagem escolar: issue de conteúdo, fora desta branch.
 - **iPhone:** o redesign não resolve o Expo Go do iOS. Precisa de upgrade de SDK ou build EAS, em
   issue própria.
+
+## Adendo de 15/09: o `main` andou, e a spec se adapta a ele
+
+Entre 14 e 15/09 o time mergeou os PRs #13 a #37. Esta branch integrou o `main` por merge, sem
+reescrever histórico. O que muda nesta spec, e prevalece sobre o texto acima quando divergir:
+
+- **Planos e cota (BER-58/61).** O plano gratuito limita livros em leitura e capítulos com quiz por
+  mês; o servidor responde 402. Isto não existia quando a spec foi escrita.
+  - A tela de capítulo fechado troca "Bora pro quiz" por "Conhecer o Premium" quando a cota do mês
+    acabou (`src/features/chapter-complete/quizCta.ts`). É a regra que o `Alert.alert` do registro
+    fazia.
+  - O sheet de registro trata o 402 de livros como convite ao Premium, não como erro.
+  - `planos`, `checkout`, `PaywallSheet` e `PlanCard` entram no escopo da F6. Premium não tem cor
+    própria: sem coroa e sem dourado (DESIGN.md).
+- **XP (BER-68).** `pages_read` guarda só as páginas novas. O XP previsto no sheet, o toast e o
+  `pagesRead` da conquista seguem a mesma conta (`pages - repeatedPages`).
+- **Quiz (#14 e #17).** A rota do quiz foi dividida em `QuizQuestionScreen`/`QuizMessageScreen`,
+  com cadeado por página e resposta imutável. A F5 troca só a apresentação e preserva a máquina de
+  estados da rota, que agora tem o estado `quota`.
+- **Exclusão de conta (#20).** Entra em Você na F6, como linha destrutiva visível.
+- **Escrita em `student_books`** só pela Edge Function `reading-list`. Estante e Explorar novas não
+  gravam direto.
+- **Dívida declarada nas guardas:** as telas do time (`planos`, `checkout`) e os `Alert.alert`
+  novos de `perfil` e `book/[id]` entram nas listas de exceção até a F6.
+
+Sequência revisada: R0 (fechar a F4) → R1 (integrar o `main`) → R2 (prova em aparelho) → R3
+(`Sheet`, confirmação destrutiva, `EmptyState` com slot, regras de Premium e limite) → F5 → F6 →
+F7 → F8 → F9. Registro na BER-77.

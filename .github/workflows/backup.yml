@@ -1,0 +1,163 @@
+name: Backup
+
+# BER-83: o projeto Supabase está no plano gratuito, que não faz backup nenhum.
+# Solução provisória até migrar para o Pro (gatilho e passos na BER-83).
+#
+# O repositório é PÚBLICO: artefatos e logs deste workflow podem ser vistos por
+# qualquer pessoa logada no GitHub. Por isso a cópia só sai do runner
+# criptografada, e o log nunca mostra conteúdo nem contagens do banco.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 03:00 em São Paulo, horário de pouco uso
+  workflow_dispatch:
+
+concurrency:
+  group: backup-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Exportar, criptografar e verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      # Tabelas cuja contagem é comparada entre produção e a cópia restaurada.
+      CHECK_TABLES: auth.users public.profiles public.reading_sessions public.answers public.student_books public.subscriptions
+    steps:
+      - name: Conferir secrets
+        run: |
+          # Sem a chave, o passo de criptografia não roda e nada é enviado em claro.
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::secret SUPABASE_DB_URL ausente"; exit 1; }
+          [ -n "$BACKUP_ENCRYPTION_KEY" ] || { echo "::error::secret BACKUP_ENCRYPTION_KEY ausente"; exit 1; }
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Contagem em produção (antes da exportação)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/check"
+          for t in $CHECK_TABLES; do
+            docker run --rm -e DB_URL="$SUPABASE_DB_URL" postgres:17 \
+              sh -c 'psql "$DB_URL" -Atqc "select count(*) from '"$t"'"' > "$RUNNER_TEMP/check/before_$t"
+          done
+
+      - name: Exportar roles, schema e dados
+        run: |
+          set -euo pipefail
+          DUMP="$RUNNER_TEMP/dump"
+          mkdir -p "$DUMP"
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f "$DUMP/roles.sql"
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$DUMP/schema.sql"
+          # Excluídas: tabelas que o papel `postgres` não pode escrever numa restauração
+          # (buckets_vectors e vector_indexes do Storage, cron.job do supabase_admin) e o
+          # histórico de execuções do cron. O agendamento do cron é recriado à mão ao
+          # restaurar — ver docs/deploy.md, "Restaurar".
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy \
+            -x storage.buckets_vectors -x storage.vector_indexes -x cron.job -x cron.job_run_details \
+            -f "$DUMP/data.sql"
+          for f in roles schema data; do
+            [ -s "$DUMP/$f.sql" ] || { echo "::error::$f.sql vazio"; exit 1; }
+          done
+
+      - name: Contagem em produção (depois da exportação)
+        run: |
+          set -euo pipefail
+          for t in $CHECK_TABLES; do
+            docker run --rm -e DB_URL="$SUPABASE_DB_URL" postgres:17 \
+              sh -c 'psql "$DB_URL" -Atqc "select count(*) from '"$t"'"' > "$RUNNER_TEMP/check/after_$t"
+          done
+
+      - name: Criptografar
+        run: |
+          set -euo pipefail
+          STAMP=$(date -u +%Y%m%d-%H%M)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/out"
+          tar -C "$RUNNER_TEMP/dump" -czf "$RUNNER_TEMP/bereading-db.tar.gz" roles.sql schema.sql data.sql
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase-fd 3 \
+            --output "$RUNNER_TEMP/out/bereading-db-$STAMP.tar.gz.gpg" \
+            "$RUNNER_TEMP/bereading-db.tar.gz" 3<<<"$BACKUP_ENCRYPTION_KEY"
+          rm -f "$RUNNER_TEMP/bereading-db.tar.gz"
+
+      # Restaura a partir do arquivo CRIPTOGRAFADO, exatamente como faria quem
+      # precisasse do backup: prova que a chave abre e que o conteúdo restaura.
+      - name: Verificar restauração num Supabase local limpo
+        run: |
+          set -euo pipefail
+          R="$RUNNER_TEMP/restore"
+          mkdir -p "$R/files"
+          gpg --batch --yes --pinentry-mode loopback --decrypt --passphrase-fd 3 \
+            --output "$R/bereading-db.tar.gz" \
+            "$RUNNER_TEMP/out/bereading-db-$STAMP.tar.gz.gpg" 3<<<"$BACKUP_ENCRYPTION_KEY"
+          tar -C "$R/files" -xzf "$R/bereading-db.tar.gz"
+
+          # Projeto local vazio, sem as migrations do repo: o schema vem do backup.
+          mkdir -p "$R/project" && cd "$R/project"
+          supabase init --force > /dev/null
+          sed -i 's/^project_id = .*/project_id = "restorecheck"/' supabase/config.toml
+          # gotrue e storage-api ficam ligados: criam as tabelas de auth e storage que o data.sql preenche.
+          supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta > /dev/null
+
+          DB=supabase_db_restorecheck
+          docker cp "$R/files/." "$DB:/tmp/restore/"
+          docker exec "$DB" psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction -q \
+            -f /tmp/restore/roles.sql \
+            -f /tmp/restore/schema.sql \
+            -c 'SET session_replication_role = replica' \
+            -f /tmp/restore/data.sql > /dev/null
+
+          FAIL=0
+
+          # O schema.sql exclui o schema auth, e com ele o trigger on_auth_user_created.
+          # Recria como manda o runbook e prova que um cadastro novo ganha perfil —
+          # contagem de linhas sozinha não pega isso (achado no restore manual de 15/09/2026).
+          docker exec "$DB" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q -c \
+            "create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();"
+          profiles_created=$(docker exec -i "$DB" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq <<'SQL' | tail -1
+          begin;
+          insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+          values ('00000000-0000-4000-8000-00000000beef', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+                  'teste-restauracao@example.invalid', '', now(), '{"display_name":"Teste Restauracao"}', now(), now());
+          select count(*) from public.profiles where user_id = '00000000-0000-4000-8000-00000000beef';
+          rollback;
+          SQL
+          )
+          if [ "$profiles_created" = "1" ]; then
+            echo "cadastro novo cria perfil após restaurar: confere"
+          else
+            echo "::error::cadastro novo não cria perfil no banco restaurado (trigger on_auth_user_created)"
+            FAIL=1
+          fi
+
+          for t in $CHECK_TABLES; do
+            restored=$(docker exec "$DB" psql -U postgres -d postgres -Atqc "select count(*) from $t")
+            before=$(cat "$RUNNER_TEMP/check/before_$t")
+            after=$(cat "$RUNNER_TEMP/check/after_$t")
+            lo=$(( before < after ? before : after )); hi=$(( before > after ? before : after ))
+            # Só o resultado vai para o log público, nunca os números.
+            if [ "$restored" -ge "$lo" ] && [ "$restored" -le "$hi" ] && { [ "$hi" -eq 0 ] || [ "$restored" -gt 0 ]; }; then
+              echo "$t: confere"
+            else
+              echo "::error::$t: contagem restaurada diverge de produção"
+              FAIL=1
+            fi
+          done
+          supabase stop --no-backup > /dev/null
+          exit $FAIL
+
+      - name: Enviar cópia criptografada
+        uses: actions/upload-artifact@v4
+        with:
+          name: bereading-db-${{ env.STAMP }}
+          path: ${{ runner.temp }}/out/*.gpg
+          retention-days: 14
+          if-no-files-found: error

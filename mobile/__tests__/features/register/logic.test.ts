@@ -168,6 +168,22 @@ describe('summarizeRange', () => {
     expect(r.repeatedPages).toBe(5);
   });
 
+  it('BER-68: XP previsto so das paginas novas, a mesma conta de computeNewPagesRead no servidor', () => {
+    // Parou na 84 e registrou 80 a 90: 11 paginas, 5 relidas (80 a 84), 6 novas.
+    const r = summarizeRange({ ...base, startText: '80', endText: '90' });
+    if (!r.valid) throw new Error(r.reason);
+    expect(r.pages).toBe(11);
+    expect(r.newPages).toBe(6);
+    expect(r.xp).toBe(6 * XP_PER_PAGE);
+  });
+
+  it('BER-68: releitura inteira de trecho ja registrado nao preve XP nenhum', () => {
+    const r = summarizeRange({ ...base, startText: '10', endText: '40' });
+    if (!r.valid) throw new Error(r.reason);
+    expect(r.newPages).toBe(0);
+    expect(r.xp).toBe(0);
+  });
+
   it('a previsao usa current_page como pagina maxima anterior', () => {
     const r = summarizeRange({ ...base, currentPage: 112, startText: '100', endText: '140' });
     if (!r.valid) throw new Error(r.reason);
@@ -192,15 +208,15 @@ describe('ctaLabel', () => {
 });
 
 describe('repeatedPagesNote', () => {
-  it('plural', () => {
+  it('plural: avisa que as relidas nao contam XP de novo (BER-68)', () => {
     expect(repeatedPagesNote(5, 84)).toBe(
-      '5 páginas desse trecho você já tinha registrado. Seu progresso tá na pág. 84.',
+      '5 páginas desse trecho você já tinha registrado, e elas não contam XP de novo. Seu progresso tá na pág. 84.',
     );
   });
 
   it('singular', () => {
     expect(repeatedPagesNote(1, 84)).toBe(
-      'Uma página desse trecho você já tinha registrado. Seu progresso tá na pág. 84.',
+      'Uma página desse trecho você já tinha registrado, e ela não conta XP de novo. Seu progresso tá na pág. 84.',
     );
   });
 });
@@ -224,10 +240,17 @@ describe('successToast', () => {
     // 250 x 5: sem Intl de proposito, mesmo motivo de formatXp (src/game/xp.ts).
     expect(successToast(250, 3).detail).toBe('+1.250 XP · 3 dias seguidos');
   });
+
+  it('BER-68: a mensagem conta o intervalo, o XP conta so as paginas novas', () => {
+    expect(successToast(11, 5, 6)).toEqual({
+      message: '11 páginas registradas',
+      detail: `+${6 * XP_PER_PAGE} XP · 5 dias seguidos`,
+    });
+  });
 });
 
 describe('chapterCompleteParams (contrato F4-7)', () => {
-  const base = { completedChapterIds: ['c-5', 'c-4'], bookId: 'b1', start: 85, end: 140, streak: 5 };
+  const base = { completedChapterIds: ['c-5', 'c-4'], bookId: 'b1', newPages: 56, streak: 5 };
 
   it('ids na ordem da resposta, unidos por virgula, e o resto como string', () => {
     expect(chapterCompleteParams({ ...base, xpBefore: 1840 })).toEqual({

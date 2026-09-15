@@ -12,7 +12,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, X, Plus, CheckCheck } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { ProfileErrorState } from '../../src/components/ProfileErrorState';
-import { getBooks, addBookToReadingList, getStudentBooks } from '../../src/api/queries';
+import { getBooks, getStudentBooks } from '../../src/api/queries';
+import { startReadingBook } from '../../src/api/edgeFunctions';
+import { PaywallSheet } from '../../src/components/PaywallSheet';
+import { useEntitlementStore } from '../../src/stores/entitlementStore';
+import { isQuotaExceededError, type QuotaExceeded } from '../../src/utils/billing';
 import { BookCover } from '../../src/components/BookCover';
 import { Chip } from '../../src/components/Chip';
 import { SectionLabel } from '../../src/components/SectionLabel';
@@ -30,6 +34,7 @@ export default function CatalogoScreen() {
   const [myBookIds, setMyBookIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [paywall, setPaywall] = useState<QuotaExceeded | null>(null);
 
   useEffect(() => {
     // BER-45: sem o setLoading(false) aqui, o `loading` inicial `true` nunca
@@ -75,10 +80,16 @@ export default function CatalogoScreen() {
     if (!profile || addingId) return;
     setAddingId(book.id);
     try {
-      await addBookToReadingList(profile.user_id, book.id);
+      // BER-58: começar um livro passa pelo servidor, que aplica o limite do plano.
+      await startReadingBook(book.id);
       setMyBookIds((prev) => new Set([...prev, book.id]));
+      useEntitlementStore.getState().refresh();
       Alert.alert('Adicionado!', `"${book.title}" está na sua lista de leitura.`);
     } catch (e: unknown) {
+      if (isQuotaExceededError(e)) {
+        setPaywall(e.quota);
+        return;
+      }
       const msg = e instanceof Error ? e.message : 'Tente novamente';
       Alert.alert('Erro', msg);
     } finally {
@@ -287,6 +298,8 @@ export default function CatalogoScreen() {
           )}
         </View>
       </ScrollView>
+
+      <PaywallSheet quota={paywall} onDismiss={() => setPaywall(null)} />
     </View>
   );
 }

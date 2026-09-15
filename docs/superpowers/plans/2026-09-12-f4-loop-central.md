@@ -12,7 +12,7 @@
 
 ## Restrições globais
 
-- **Branch:** `feature/premium-ui-redesign`, worktree `C:\Users\guiro\bereading-redesign`, comandos de `mobile/`.
+- **Branch:** `feature/premium-ui-redesign`, comandos de `mobile/`.
 - **Sem push e sem PR.**
 - **Nada em `supabase/`.** Em `src/api/` só a mudança autorizada na Tarefa 3.
 - **O guard de autenticação do `app/_layout.tsx` é intocável.**

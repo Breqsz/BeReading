@@ -10,17 +10,21 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useProgressStore } from '../src/stores/progressStore';
+import { useEntitlementStore } from '../src/stores/entitlementStore';
 import { getChaptersByIds } from '../src/api/queries';
 import { quizInviteLine } from '../src/assistant/lines';
 import { Button, Screen } from '../src/ui';
 import {
   ChapterCompleteSkeleton, ClosedChapterHeader, GainTags, XpRing, chapterCompleteLayout,
-  chapterTargets, closedTitle, parseParams, streakTagLabel, xpGained, xpPlan, xpTagLabel,
+  chapterTargets, closedTitle, parseParams, quizCta, streakTagLabel, xpGained, xpPlan, xpTagLabel,
   type ChapterCompleteRawParams,
 } from '../src/features/chapter-complete';
 import type { Chapter } from '../src/types/database';
+import type { Entitlement } from '../src/utils/billing';
 
-type Carga = { estado: 'carregando' } | { estado: 'pronto'; capitulos: Chapter[] | null };
+type Carga =
+  | { estado: 'carregando' }
+  | { estado: 'pronto'; capitulos: Chapter[] | null; plano: Entitlement | null };
 
 export default function ChapterCompleteScreen() {
   const router = useRouter();
@@ -37,20 +41,23 @@ export default function ChapterCompleteScreen() {
 
   const ids = params.chapterIds;
   const [carga, setCarga] = useState<Carga>(() =>
-    ids.length > 0 ? { estado: 'carregando' } : { estado: 'pronto', capitulos: null },
+    ids.length > 0 ? { estado: 'carregando' } : { estado: 'pronto', capitulos: null, plano: null },
   );
 
   useEffect(() => {
     if (ids.length === 0) return;
     let cancelado = false;
-    getChaptersByIds(ids)
-      .then((capitulos) => {
-        if (!cancelado) setCarga({ estado: 'pronto', capitulos });
-      })
+    // O plano vem junto dos capitulos (BER-58): o CTA so aparece quando os dois
+    // chegaram, para "Bora pro quiz" nao virar "Conhecer o Premium" na frente do
+    // leitor. `refresh` devolve null em falha, e sem plano o quiz abre: a tela
+    // do quiz tem o estado de cota como rede.
+    Promise.all([
       // F4-15: sem os numeros a tela segue, sem inventar nenhum.
-      .catch(() => {
-        if (!cancelado) setCarga({ estado: 'pronto', capitulos: null });
-      });
+      getChaptersByIds(ids).catch(() => null),
+      useEntitlementStore.getState().refresh(),
+    ]).then(([capitulos, plano]) => {
+      if (!cancelado) setCarga({ estado: 'pronto', capitulos, plano });
+    });
     return () => {
       cancelado = true;
     };
@@ -70,7 +77,7 @@ export default function ChapterCompleteScreen() {
   }
 
   const alvos = chapterTargets(ids, carga.capitulos);
-  const quiz = alvos.quizChapterId;
+  const cta = quizCta(alvos.quizChapterId, carga.plano);
   const plano = xpPlan({
     xpBefore: params.xpBefore,
     gained: xpGained(params.pagesRead) ?? 0,
@@ -84,14 +91,19 @@ export default function ChapterCompleteScreen() {
       <View style={chapterCompleteLayout.corpo}>
         <ClosedChapterHeader
           title={closedTitle(alvos.numbers, ids.length)}
-          invite={quiz ? quizInviteLine() : null}
+          invite={cta.kind === 'quiz' ? quizInviteLine() : cta.kind === 'premium' ? cta.line : null}
         />
         {plano ? <XpRing plan={plano} /> : null}
         <GainTags xp={xpTagLabel(params.pagesRead)} streak={streakTagLabel(params.streak)} />
       </View>
       <View style={chapterCompleteLayout.acoes}>
-        {/* replace: a conquista nao fica na pilha atras do quiz. */}
-        {quiz ? <Button onPress={() => router.replace(`/quiz/${quiz}`)}>Bora pro quiz</Button> : null}
+        {/* replace: a conquista nao fica na pilha atras do quiz nem dos planos. */}
+        {cta.kind === 'quiz' ? (
+          <Button onPress={() => router.replace(`/quiz/${cta.chapterId}`)}>Bora pro quiz</Button>
+        ) : null}
+        {cta.kind === 'premium' ? (
+          <Button onPress={() => router.replace('/planos')}>Conhecer o Premium</Button>
+        ) : null}
         {depois}
       </View>
     </Screen>

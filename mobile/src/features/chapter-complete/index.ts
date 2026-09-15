@@ -7,6 +7,8 @@ export {
   parseParams, chapterTargets, closedTitle, xpGained, xpPlan, xpAt, xpTagLabel, streakTagLabel,
   ringCaption, ringLabel,
 } from './logic';
+export { quizCta } from './quizCta';
+export type { QuizCta } from './quizCta';
 export type {
   ChapterCompleteRawParams, ChapterCompleteInput, ChapterTargets, CountSegment, XpPlan,
 } from './logic';

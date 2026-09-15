@@ -91,7 +91,10 @@ export type RangeSummary =
       valid: true;
       start: number;
       end: number;
+      /** Paginas do intervalo, com as relidas. E o que o CTA diz registrar. */
       pages: number;
+      /** So as paginas que ainda nao tinham sido registradas: as que contam XP. */
+      newPages: number;
       xp: number;
       repeatedPages: number;
       closing: ChapterPages[];
@@ -110,6 +113,11 @@ interface RangeInput {
  * Tudo que o resumo ao vivo e o CTA precisam, de uma vez. Invalido sempre
  * traz o motivo, porque o CTA desabilitado mostra por que (spec S7.2). A
  * validacao de intervalo continua sendo `validatePageRange`, sem regra nova.
+ *
+ * BER-68: o servidor grava em `pages_read` so as paginas novas
+ * (`computeNewPagesRead`, em register-reading-session/reading.ts), e e dali que
+ * o XP sai. O XP previsto aqui segue a mesma conta: o intervalo menos o que ja
+ * estava registrado, que e `pages - repeatedPages`.
  */
 export function summarizeRange({
   startText, endText, totalPages, currentPage, chapters,
@@ -123,13 +131,16 @@ export function summarizeRange({
   if (erro) return { valid: false, reason: erro };
 
   const pages = end - start + 1;
+  const repeatedPages = pagesAlreadyRead(start, end, currentPage);
+  const newPages = pages - repeatedPages;
   return {
     valid: true,
     start,
     end,
     pages,
-    xp: pages * XP_PER_PAGE,
-    repeatedPages: pagesAlreadyRead(start, end, currentPage),
+    newPages,
+    xp: newPages * XP_PER_PAGE,
+    repeatedPages,
     closing: chapters ? predictCompletedChapters(chapters, currentPage, end) : [],
   };
 }
@@ -139,24 +150,30 @@ export function ctaLabel(pages: number): string {
 }
 
 /**
- * BER-54: pagina relida conta de novo (`pages_read` e coluna gerada), e sem
- * migration nao da pra corrigir a contagem. O que da e a pessoa saber antes de
- * enviar. Conteudo da nota antiga, no registro de voz novo.
+ * BER-54: a pessoa sabe antes de enviar que parte do trecho ja estava
+ * registrada. Desde a BER-68 essas paginas nao contam XP de novo, e a nota diz
+ * isso, porque o XP do resumo ja vem sem elas.
  */
 export function repeatedPagesNote(repeated: number, currentPage: number): string {
   const quantas = repeated === 1 ? 'Uma página' : `${repeated} páginas`;
-  return `${quantas} desse trecho você já tinha registrado. Seu progresso tá na pág. ${currentPage}.`;
+  const contam = repeated === 1 ? 'ela não conta' : 'elas não contam';
+  return `${quantas} desse trecho você já tinha registrado, e ${contam} XP de novo. Seu progresso tá na pág. ${currentPage}.`;
 }
 
 /**
  * O toast do registro sem capitulo fechado (spec S7.2). Sequencia vem de
- * `current_streak` da resposta; XP e paginas x XP_PER_PAGE, a mesma parcela
- * que `totalXp` soma a partir de `reading_sessions.pages_read`.
+ * `current_streak` da resposta. XP e `newPages` x XP_PER_PAGE, a mesma parcela
+ * que `totalXp` soma a partir de `reading_sessions.pages_read` (BER-68: so
+ * paginas novas). Sem `newPages`, o intervalo inteiro era novo.
  */
-export function successToast(pages: number, streak: number): { message: string; detail: string } {
+export function successToast(
+  pages: number,
+  streak: number,
+  newPages: number = pages,
+): { message: string; detail: string } {
   const message = pages === 1 ? '1 página registrada' : `${pages} páginas registradas`;
   const dias = streak === 1 ? '1 dia seguido' : `${streak} dias seguidos`;
-  return { message, detail: `+${formatXp(pages * XP_PER_PAGE)} XP · ${dias}` };
+  return { message, detail: `+${formatXp(newPages * XP_PER_PAGE)} XP · ${dias}` };
 }
 
 // `type`, nao `interface`: o expo-router tipa params como registro com indice
@@ -164,6 +181,7 @@ export function successToast(pages: number, streak: number): { message: string; 
 export type ChapterCompleteParams = {
   chapterIds: string;
   bookId: string;
+  /** As paginas que contam XP neste registro (BER-68), nao o intervalo. */
   pagesRead: string;
   streak: string;
   xpBefore?: string;
@@ -172,8 +190,8 @@ export type ChapterCompleteParams = {
 interface ChapterCompleteInput {
   completedChapterIds: string[];
   bookId: string;
-  start: number;
-  end: number;
+  /** Paginas novas do registro (`RangeSummary.newPages`). */
+  newPages: number;
   streak: number;
   /** XP lido antes do envio; `null` quando o store nunca carregou. */
   xpBefore: number | null;
@@ -184,12 +202,12 @@ interface ChapterCompleteInput {
  * ids na ordem da resposta, unidos por virgula; `xpBefore` so existe com dado.
  */
 export function chapterCompleteParams({
-  completedChapterIds, bookId, start, end, streak, xpBefore,
+  completedChapterIds, bookId, newPages, streak, xpBefore,
 }: ChapterCompleteInput): ChapterCompleteParams {
   const params: ChapterCompleteParams = {
     chapterIds: completedChapterIds.join(','),
     bookId,
-    pagesRead: String(end - start + 1),
+    pagesRead: String(newPages),
     streak: String(streak),
   };
   if (xpBefore !== null) params.xpBefore = String(xpBefore);

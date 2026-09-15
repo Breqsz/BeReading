@@ -1,7 +1,12 @@
 // supabase/functions/evaluate-answer/index.ts
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { authErrorResponse, isServiceRole, resolveUserId } from '../_shared/auth.ts';
+import { hasReachedChapterEnd } from '../_shared/progress.ts';
+import { notifyOps } from '../_shared/ops-alert.ts';
+import { existingAnswerResult, isUniqueViolation, PENDING_FEEDBACK } from './submission.ts';
 import { parseEvaluation, type ParsedEvaluation } from '../_shared/ai-json.ts';
+import { loadEntitlement } from '../_shared/entitlement.ts';
+import { canAnswerChapter, quotaExceededResponse } from '../_shared/plan-rules.ts';
 import type { AnswerPayload } from '../_shared/types.ts';
 // BER-35: o prompt vive em módulo próprio para ser testado de verdade.
 // BER-65: sem "aluno" e sem "ensino fundamental" — o leitor é adulto.
@@ -106,12 +111,14 @@ async function evaluateAndStore(
       .eq('id', answerId);
 
     if (updateError) {
-      console.error('Failed to update answer with evaluation:', updateError.message);
+      await notifyOps('evaluate-answer', `falha ao gravar avaliação da resposta ${answerId}: ${updateError.message}`);
     }
 
     return evaluation;
   } catch (err) {
-    console.error(`[evaluate-answer] avaliação falhou para a resposta ${answerId}:`, err);
+    // BER-39: antes, só um console.error — sem alerta, sem rastro depois de
+    // 24h de log do Edge Runtime.
+    await notifyOps('evaluate-answer', `avaliação falhou para a resposta ${answerId}: ${err}`);
     // Marcar como falha — o cron de retry volta aqui depois (BER-36).
     await supabase
       .from('answers')
@@ -179,7 +186,9 @@ async function handleReevaluation(supabase: SupabaseClient, answerId: unknown): 
   });
 }
 
-Deno.serve(async (req) => {
+// BER-49: exportada para que o teste de handler chame o código real, não uma
+// cópia — o mesmo raciocínio da BER-35 para a lógica pura.
+export async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -199,19 +208,25 @@ Deno.serve(async (req) => {
 
   const { question_id, user_id: bodyUserId, answer_text } = payload;
 
+  const supabase = createServiceClient();
+
+  // BER-36: chamada do cron para re-avaliar uma resposta que ficou sem nota.
+  // Só entra aqui quem apresenta a service_role key; para o app, nada muda.
+  //
+  // BER-49: este guard tinha que vir ANTES da validação de `question_id`/
+  // `answer_text` logo abaixo. O cron manda só `{ answer_id }` (ver
+  // retry-pending-quizzes/index.ts) — com o guard depois, todo request do cron
+  // caía 400 sem nunca chegar em `handleReevaluation`. O retry da BER-36 nunca
+  // tinha reavaliado uma resposta sequer.
+  if (isServiceRole(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))) {
+    return await handleReevaluation(supabase, payload.answer_id);
+  }
+
   if (!question_id || !answer_text?.trim()) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
-  }
-
-  const supabase = createServiceClient();
-
-  // BER-36: chamada do cron para re-avaliar uma resposta que ficou sem nota.
-  // Só entra aqui quem apresenta a service_role key; para o app, nada muda.
-  if (isServiceRole(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))) {
-    return await handleReevaluation(supabase, payload.answer_id);
   }
 
   // BER-30: sem isto, o upsert em (question_id, user_id) abaixo sobrescreve a
@@ -227,10 +242,10 @@ Deno.serve(async (req) => {
     return authErrorResponse(err);
   }
 
-  // Buscar pergunta + conteúdo do capítulo
+  // Buscar pergunta + capítulo (fim e livro, para a trava) + conteúdo
   const { data: question } = await supabase
     .from('questions')
-    .select('question_text, type, chapter_id, chapters(book_contents(content_text))')
+    .select('question_text, type, chapter_id, chapters(end_page, book_id, book_contents(content_text))')
     .eq('id', question_id)
     .single();
 
@@ -241,23 +256,68 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Salvar resposta imediatamente com evaluation_status = 'pending'
+  // BER-48: só responde quem leu. Mesma regra que dispara a geração das perguntas
+  // no register-reading-session: a maior página registrada alcança o fim do capítulo.
+  // Sem tipos gerados, o supabase-js infere a relação como lista; o PostgREST devolve
+  // objeto, porque é muitos-para-um (questions.chapter_id → chapters).
+  const chapter = question.chapters as unknown as { end_page: number; book_id: string } | null;
+  const { data: sessions } = await supabase
+    .from('reading_sessions')
+    .select('end_page')
+    .eq('user_id', user_id)
+    .eq('book_id', chapter?.book_id ?? '');
+
+  if (!chapter || !hasReachedChapterEnd(chapter.end_page, sessions ?? [])) {
+    return new Response(JSON.stringify({ error: 'Chapter not completed' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // BER-58: a cota do plano gratuito mora aqui, não em generate-questions. As
+  // perguntas são cache por capítulo, compartilhado entre todos os leitores —
+  // gerar custa uma vez por capítulo. O custo de IA que cresce por leitor é a
+  // avaliação (uma chamada por resposta). Capítulo já começado nunca trava no meio.
+  const entitlement = await loadEntitlement(supabase, user_id);
+  const quota = canAnswerChapter({
+    premium: entitlement.premium,
+    limits: entitlement.limits,
+    chapterId: question.chapter_id,
+    startedChapterIds: entitlement.startedChapterIds,
+    chaptersThisMonth: entitlement.chaptersThisMonth,
+  });
+  if (!quota.allowed) {
+    return quotaExceededResponse('quiz_chapters', quota, entitlement.usageResetsAt);
+  }
+
+  // BER-48: a resposta é imutável — insert, não upsert (ver submission.ts).
   const { data: savedAnswer, error: answerError } = await supabase
     .from('answers')
-    .upsert({
+    .insert({
       question_id,
       user_id,
       answer_text: answer_text.trim(),
       evaluation_status: 'pending',
-      // BER-54: refazer a resposta mantinha a nota e o feedback da anterior. Se a
-      // nova avaliação falhasse, a tela mostrava a avaliação antiga ao lado do
-      // texto novo — parecendo que a IA respondeu, e respondeu a outra coisa.
-      comprehension_score: null,
-      ai_feedback: null,
-      evaluated_at: null,
-    }, { onConflict: 'question_id,user_id' })
+    })
     .select('id')
     .single();
+
+  if (isUniqueViolation(answerError)) {
+    const { data: existing } = await supabase
+      .from('answers')
+      .select('evaluation_status, comprehension_score, ai_feedback')
+      .eq('question_id', question_id)
+      .eq('user_id', user_id)
+      .single();
+
+    return new Response(JSON.stringify({
+      error: 'Answer already submitted',
+      data: existing ? existingAnswerResult(existing) : null,
+    }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   if (answerError || !savedAnswer) {
     return new Response(JSON.stringify({ error: 'Failed to save answer' }), {
@@ -289,8 +349,12 @@ Deno.serve(async (req) => {
   return new Response(JSON.stringify({
     data: {
       score: null,
-      feedback: 'Resposta recebida! A avaliação ficará disponível em breve.',
+      feedback: PENDING_FEEDBACK,
     },
     error: null,
   }), { headers: { 'Content-Type': 'application/json' } });
-});
+}
+
+// BER-49: só sobe o listener quando este arquivo é o entrypoint (deploy real).
+// Um teste que importa `handler` não pode abrir uma porta de verdade.
+if (import.meta.main) Deno.serve(handler);

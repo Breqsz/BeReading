@@ -41,6 +41,14 @@ jest.mock('../../src/api/queries', () => ({
   getChaptersByIds: jest.fn(),
 }));
 
+// BER-58: a tela busca o plano junto dos capitulos. O store real iria a rede
+// (get-entitlement); aqui `refresh` devolve o plano que o teste escolher, e
+// null (falha de rede) por padrao.
+const mockRefreshPlano = jest.fn();
+jest.mock('../../src/stores/entitlementStore', () => ({
+  useEntitlementStore: { getState: () => ({ refresh: mockRefreshPlano }) },
+}));
+
 import ChapterCompleteScreen from '../../app/chapter-complete';
 import * as RingModule from '../../src/ui/Ring';
 import { useProgressStore } from '../../src/stores/progressStore';
@@ -48,6 +56,7 @@ import { getChaptersByIds } from '../../src/api/queries';
 import { levelFor } from '../../src/game/xp';
 import { motion } from '../../src/theme/tokens';
 import type { Chapter } from '../../src/types/database';
+import type { Entitlement } from '../../src/utils/billing';
 
 const mGetChapters = getChaptersByIds as jest.Mock;
 
@@ -418,5 +427,57 @@ describe('chapter-complete (spec S7.3)', () => {
       expect(tela.queryByTestId('ring-xp', { includeHiddenElements: true })).toBeNull();
       expect(tela.getByText('+200 XP')).toBeTruthy();
     });
+  });
+});
+
+describe('capitulo fechado: cota de quiz do plano gratuito (BER-58)', () => {
+  const planoGratuito = (over: Partial<Entitlement> = {}): Entitlement => ({
+    plan: 'free',
+    premium_plan: { id: 'premium_monthly', name: 'Premium', price_cents: 2490, currency: 'BRL', interval: 'month' },
+    subscription: null,
+    limits: { max_active_books: 2, monthly_quiz_chapters: 4 },
+    free_limits: { max_active_books: 2, monthly_quiz_chapters: 4 },
+    usage: { active_books: 1, quiz_chapters_this_month: 4 },
+    usage_resets_at: '2026-10-01T03:00:00.000Z',
+    started_chapter_ids: [],
+    ...over,
+  });
+
+  beforeEach(() => {
+    registro();
+    storeCom(1840);
+    mGetChapters.mockResolvedValue([capitulo('c-4', 4)]);
+  });
+
+  it('cota esgotada: o CTA vira "Conhecer o Premium", com a fala de quando os quizzes voltam', async () => {
+    mockRefreshPlano.mockResolvedValue(planoGratuito());
+    const tela = await montar();
+
+    expect(tela.queryByRole('button', { name: 'Bora pro quiz' })).toBeNull();
+    expect(tela.getByText('Você usou seus 4 quizzes do mês. Seus quizzes voltam em 01/10/2026.')).toBeTruthy();
+    fireEvent.press(tela.getByRole('button', { name: 'Conhecer o Premium' }));
+    expect(mockReplace).toHaveBeenCalledWith('/planos');
+  });
+
+  it('capitulo ja comecado nunca trava: segue "Bora pro quiz"', async () => {
+    mockRefreshPlano.mockResolvedValue(planoGratuito({ started_chapter_ids: ['c-4'] }));
+    const tela = await montar();
+
+    fireEvent.press(tela.getByRole('button', { name: 'Bora pro quiz' }));
+    expect(mockReplace).toHaveBeenCalledWith('/quiz/c-4');
+  });
+
+  it('o CTA espera o plano: enquanto ele nao chega, a tela segue no skeleton, com o "Depois"', async () => {
+    let liberarPlano: (p: Entitlement | null) => void = () => {};
+    mockRefreshPlano.mockImplementation(() => new Promise((res) => { liberarPlano = res; }));
+    const tela = await montar();
+
+    expect(tela.queryByRole('button', { name: 'Bora pro quiz' })).toBeNull();
+    expect(tela.getByRole('button', { name: 'Depois' })).toBeTruthy();
+
+    await act(async () => {
+      liberarPlano(null);
+    });
+    expect(tela.getByRole('button', { name: 'Bora pro quiz' })).toBeTruthy();
   });
 });

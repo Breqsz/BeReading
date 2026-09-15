@@ -128,6 +128,21 @@ export interface ClassroomBook {
   status: 'required' | 'recommended';
 }
 
+/** BER-61: assinatura Premium. Sem linha, o leitor está no plano gratuito. */
+export interface Subscription {
+  id: string;
+  user_id: string;
+  plan_id: 'premium_monthly';
+  status: 'active' | 'expired';
+  provider: 'mock' | 'app_store' | 'play_store';
+  provider_transaction_id: string | null;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChapterQuizStatus {
   id: string;
   chapter_id: string;
@@ -196,6 +211,7 @@ export interface Database {
       student_badges: TableOf<StudentBadge, 'id' | 'earned_at'>;
       classroom_books: TableOf<ClassroomBook, 'id'>;
       chapter_quiz_status: TableOf<ChapterQuizStatus, 'id'>;
+      subscriptions: TableOf<Subscription, 'id' | 'created_at' | 'updated_at'>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

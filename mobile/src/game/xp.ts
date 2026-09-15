@@ -5,8 +5,9 @@
 // que está persistido, então o mesmo leitor vê o mesmo número em qualquer
 // aparelho. Persistir XP no banco é decisão de backend, fora desta branch.
 //
-// Caveat herdado: página relida conta de novo, porque `pages_read` é coluna
-// gerada no servidor (BER-68).
+// Desde a BER-68, `pages_read` guarda só as páginas novas de cada sessão, e
+// página relida não soma XP de novo. O histórico anterior não foi recalculado
+// (decisão da BER-68), então sessões antigas ainda podem trazer relidas.
 
 export const XP_PER_PAGE = 5;
 export const XP_PER_BADGE = 100;

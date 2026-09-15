@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/stores/authStore';
+import { useEntitlementStore } from '../src/stores/entitlementStore';
 import { loadOrCreateProfile } from '../src/api/profile';
 import { useAppFonts } from '../src/theme/fonts';
 import { color } from '../src/theme/tokens';
@@ -63,6 +64,8 @@ export default function RootLayout() {
         await hydrateProfile(session);
       } else {
         clear();
+        // BER-61: o plano do leitor anterior não pode vazar para o próximo login.
+        useEntitlementStore.getState().clear();
       }
     });
 

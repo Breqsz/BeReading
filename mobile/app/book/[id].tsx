@@ -5,25 +5,40 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
-import { getBookWithChapters } from '../../src/api/queries';
+import { BookmarkMinus, BookmarkPlus, ChevronRight, Lock } from 'lucide-react-native';
+import { getBookWithChapters, getStudentBookEntry } from '../../src/api/queries';
+import { startReadingBook, stopReadingBook } from '../../src/api/edgeFunctions';
+import { GhostButton } from '../../src/components/GhostButton';
+import { PaywallSheet } from '../../src/components/PaywallSheet';
+import { useEntitlementStore } from '../../src/stores/entitlementStore';
+import { isQuotaExceededError, type QuotaExceeded } from '../../src/utils/billing';
 import { TopBar } from '../../src/components/TopBar';
 import { BookCover } from '../../src/components/BookCover';
 import { Card } from '../../src/components/Card';
 import { SectionLabel } from '../../src/components/SectionLabel';
 import { Press3DButton } from '../../src/components/Press3DButton';
+import { useAuthStore } from '../../src/stores/authStore';
 import { colors, fonts, radii } from '../../src/theme/tokens';
 import { categoryOf } from '../../src/theme/categories';
-import type { Book, Chapter } from '../../src/types/database';
+import { chapterLockState } from '../../src/utils/chapterGate';
+import type { Book, Chapter, StudentBook } from '../../src/types/database';
 
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { profile } = useAuthStore();
   const [data, setData] = useState<(Book & { chapters: Chapter[] }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // BER-48: até onde o leitor chegou neste livro. `null` = ainda não se sabe.
+  const [currentPage, setCurrentPage] = useState<number | null>(null);
+  // BER-58: se o livro está em leitura, tirado da leitura ou nunca começado (`null`).
+  const [readingStatus, setReadingStatus] = useState<StudentBook['status'] | null>(null);
+  const [updatingList, setUpdatingList] = useState(false);
+  const [paywall, setPaywall] = useState<QuotaExceeded | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -38,6 +53,54 @@ export default function BookDetailScreen() {
 
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !profile) return;
+    let cancelled = false;
+
+    getStudentBookEntry(profile.user_id, id)
+      .then((entry) => {
+        if (cancelled) return;
+        setCurrentPage(entry?.current_page ?? 0);
+        setReadingStatus(entry?.status ?? null);
+      })
+      // Sem a página atual a tela não bloqueia nada; a trava de verdade é o servidor.
+      .catch(() => { if (!cancelled) setCurrentPage(null); });
+
+    return () => { cancelled = true; };
+  }, [id, profile?.user_id]);
+
+  // BER-58: no plano gratuito só dá para acompanhar alguns livros por vez. Tirar
+  // um da leitura libera a vaga e guarda a página — voltar continua de onde parou.
+  async function updateReadingList(action: 'start' | 'stop') {
+    if (!id || updatingList) return;
+    setUpdatingList(true);
+    try {
+      const result = action === 'start' ? await startReadingBook(id) : await stopReadingBook(id);
+      setReadingStatus(result.status);
+      useEntitlementStore.getState().refresh();
+    } catch (e: unknown) {
+      if (isQuotaExceededError(e)) {
+        setPaywall(e.quota);
+        return;
+      }
+      Alert.alert('Não foi possível atualizar sua estante', e instanceof Error ? e.message : 'Tente novamente');
+    } finally {
+      setUpdatingList(false);
+    }
+  }
+
+  function handleStopReading() {
+    if (updatingList) return;
+    Alert.alert(
+      'Tirar da leitura?',
+      `Seu progresso fica salvo${currentPage ? ` na página ${currentPage}` : ''}. O livro sai da sua estante e a vaga fica livre para outro — dá para voltar a ele quando quiser.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Tirar da leitura', style: 'destructive', onPress: () => updateReadingList('stop') },
+      ],
+    );
+  }
 
   if (loading) {
     return (
@@ -132,6 +195,17 @@ export default function BookDetailScreen() {
           </View>
         </View>
 
+        {readingStatus === 'reading' && (
+          <GhostButton onPress={handleStopReading} Icon={BookmarkMinus}>
+            {updatingList ? 'Atualizando…' : 'Tirar da leitura'}
+          </GhostButton>
+        )}
+        {readingStatus === 'dropped' && (
+          <Press3DButton onPress={() => updateReadingList('start')} disabled={updatingList} Icon={BookmarkPlus}>
+            {updatingList ? 'Atualizando…' : 'Voltar a ler'}
+          </Press3DButton>
+        )}
+
         {/* Capítulos */}
         <View>
           <SectionLabel
@@ -156,65 +230,88 @@ export default function BookDetailScreen() {
             </Card>
           ) : (
             <Card style={{ overflow: 'hidden', padding: 0 }}>
-              {sortedChapters.map((chapter, index) => (
-                <Pressable
-                  key={chapter.id}
-                  onPress={() => router.push(`/quiz/${chapter.id}`)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 16,
-                    gap: 14,
-                    borderBottomWidth: index < sortedChapters.length - 1 ? 1 : 0,
-                    borderBottomColor: colors.hairline,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <View style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    backgroundColor: colors.gold,
-                    borderBottomWidth: 3,
-                    borderBottomColor: colors.goldDeep,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <Text style={{
-                      fontFamily: fonts.black,
-                      fontSize: 13,
-                      color: '#fff',
-                    }}>{chapter.number}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{
-                      fontFamily: fonts.bold,
-                      fontSize: 14,
-                      color: colors.text,
-                    }}>{chapter.title ?? `Capítulo ${chapter.number}`}</Text>
-                    <Text style={{
-                      fontFamily: fonts.semi,
-                      fontSize: 12,
-                      color: colors.textMute,
-                      marginTop: 2,
+              {sortedChapters.map((chapter, index) => {
+                // BER-48: quiz fechado até o leitor chegar ao fim do capítulo. Sem saber
+                // a página atual, não bloqueia — o servidor ainda recusa com 403.
+                // BER-72: capítulo sem paginação não tem fim para alcançar, então
+                // libera, como o servidor: `hasReachedChapterEnd` compara com `>=`,
+                // e nulo vira 0 na comparação.
+                const lock = currentPage === null || typeof chapter.end_page !== 'number'
+                  ? { unlocked: true, pagesLeft: 0 }
+                  : chapterLockState(chapter.end_page, currentPage);
+                const locked = !lock.unlocked;
+                const title = chapter.title ?? `Capítulo ${chapter.number}`;
+
+                return (
+                  <Pressable
+                    key={chapter.id}
+                    onPress={locked ? undefined : () => router.push(`/quiz/${chapter.id}`)}
+                    disabled={locked}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: locked }}
+                    accessibilityLabel={locked
+                      ? `${title}. Quiz fechado: leia até a página ${chapter.end_page}.`
+                      : `${title}. Abrir o quiz.`}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 16,
+                      gap: 14,
+                      borderBottomWidth: index < sortedChapters.length - 1 ? 1 : 0,
+                      borderBottomColor: colors.hairline,
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <View style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      backgroundColor: locked ? colors.surface : colors.gold,
+                      borderBottomWidth: 3,
+                      borderBottomColor: locked ? colors.surface2 : colors.goldDeep,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
                     }}>
-                      {/* BER-72: start_page/end_page podem ser nulos (livro sem
-                          paginacao por capitulo). Sem os dois, nao renderiza a
-                          faixa — texto quebrado ("p. –") e pior que nao mostrar
-                          nada. Tela legada, sem redesenho (F5/F6). */}
-                      {typeof chapter.start_page === 'number' && typeof chapter.end_page === 'number'
-                        ? `p. ${chapter.start_page}–${chapter.end_page}`
-                        : null}
-                    </Text>
-                  </View>
-                  <ChevronRight size={18} color={colors.textMute} />
-                </Pressable>
-              ))}
+                      <Text style={{
+                        fontFamily: fonts.black,
+                        fontSize: 13,
+                        color: locked ? colors.textMute : '#fff',
+                      }}>{chapter.number}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{
+                        fontFamily: fonts.bold,
+                        fontSize: 14,
+                        color: locked ? colors.textSoft : colors.text,
+                      }}>{title}</Text>
+                      <Text style={{
+                        fontFamily: fonts.semi,
+                        fontSize: 12,
+                        color: colors.textMute,
+                        marginTop: 2,
+                      }}>
+                        {/* BER-72: sem as duas páginas, a faixa não aparece. "p. null–null"
+                            é pior que nada. Tela legada, redesenho na F5. */}
+                        {locked
+                          ? `Leia até a p. ${chapter.end_page} para abrir o quiz`
+                          : typeof chapter.start_page === 'number' && typeof chapter.end_page === 'number'
+                            ? `p. ${chapter.start_page}–${chapter.end_page}`
+                            : null}
+                      </Text>
+                    </View>
+                    {locked
+                      ? <Lock size={16} color={colors.textMute} strokeWidth={2.2} />
+                      : <ChevronRight size={18} color={colors.textMute} />}
+                  </Pressable>
+                );
+              })}
             </Card>
           )}
         </View>
       </ScrollView>
+
+      <PaywallSheet quota={paywall} onDismiss={() => setPaywall(null)} />
     </View>
   );
 }

@@ -20,7 +20,7 @@ Consequência para quem executa: você tem liberdade de implementação **dentro
 
 ## Restrições globais
 
-- **Branch:** `feature/premium-ui-redesign`, worktree `C:\Users\guiro\bereading-redesign`. Comandos a partir de `mobile/`.
+- **Branch:** `feature/premium-ui-redesign`. Comandos a partir de `mobile/`.
 - **Sem push e sem PR.** Commits locais.
 - **Nada em `supabase/`, `src/api/` ou regra de negócio.**
 - **O guard de autenticação do `app/_layout.tsx` é intocável.**

@@ -70,7 +70,6 @@ const EXCECOES_COR = new Set([
 const EXCECAO_COR = new Set([
   'app/(auth)/confirm-email.tsx',
   'app/(tabs)/catalogo.tsx',
-  'app/(tabs)/livros.tsx',
   'app/(tabs)/perfil.tsx',
   // Telas do time que chegaram no merge do main de 15/09 (PR #27, BER-58/61),
   // escritas no sistema antigo. Divida declarada: migram na F6.

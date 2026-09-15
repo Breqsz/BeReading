@@ -65,7 +65,7 @@ export function scoreLine(score: number | null): string {
   return 'Essa não foi. Vale reler o trecho antes de seguir.';
 }
 
-export type QuizStateKey = 'polling' | 'still-generating' | 'no-content' | 'failed';
+export type QuizStateKey = 'polling' | 'still-generating' | 'no-content' | 'failed' | 'quota';
 
 /**
  * Os estados da tela de quiz, ditos pelo assistente. A maquina de estados nao
@@ -92,7 +92,29 @@ export function quizStateLine(
       };
     case 'failed':
       return { text: 'Deu ruim do meu lado. Tenta de novo daqui a pouco.', cta: 'Tentar de novo' };
+    case 'quota':
+      // BER-58: nao e erro. A data de volta e o convite vem de paywallCopy, na tela.
+      return { text: 'Seus quizzes do mês acabaram. Sua leitura continua valendo.', cta: 'Conhecer o Premium' };
   }
+}
+
+/**
+ * A fala entre uma pergunta e a proxima na conversa do quiz (spec 7.5). Antes
+ * da reflexao, avisa que nao existe resposta certa, para o leitor nao travar
+ * procurando a "correta".
+ */
+export function quizTransitionLine(nextType: 'comprehension' | 'reflection', isLast: boolean): string {
+  if (nextType === 'reflection') {
+    return isLast
+      ? 'Agora a última, e essa não tem resposta certa.'
+      : 'Agora uma de reflexão. Essa não tem resposta certa.';
+  }
+  return 'Boa. Próxima.';
+}
+
+/** Titulo do resumo do quiz (spec 7.6). Sem o numero do capitulo, nao inventa um. */
+export function chapterUnderstoodTitle(chapterNumber: number | null): string {
+  return chapterNumber === null ? 'Quiz fechado.' : `Capítulo ${chapterNumber}, entendido.`;
 }
 
 export function pendingQuizLine(chapterNumber: number, count: number): string {

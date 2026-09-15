@@ -2,7 +2,7 @@ import * as lines from '../../src/assistant/lines';
 import {
   greeting, streakLine, streakRiskLine, chapterClosedTitle,
   levelUpLine, scoreLine, quizStateLine, pendingQuizLine, staleBookLine,
-  chapterClosedTitleWithoutNumber, quizInviteLine,
+  chapterClosedTitleWithoutNumber, quizInviteLine, quizTransitionLine, chapterUnderstoodTitle,
 } from '../../src/assistant/lines';
 import { ASSISTANT_NAME } from '../../src/assistant/persona';
 
@@ -25,14 +25,18 @@ const TODAS = [
   quizStateLine('still-generating', 5).text,
   quizStateLine('no-content', 5).text,
   quizStateLine('failed', 5).text,
+  quizStateLine('quota', 5).text,
+  quizTransitionLine('comprehension', false), quizTransitionLine('reflection', true),
+  quizTransitionLine('reflection', false),
+  chapterUnderstoodTitle(4), chapterUnderstoodTitle(null),
 ];
 
 // Se este teste falhar, uma fala nova foi exportada e falta pôr uma amostra
 // dela em TODAS — senão ela escapa do contrato de voz sem ninguém notar.
 it('TODAS cobre toda fala exportada por lines.ts', () => {
   expect(Object.keys(lines).sort()).toEqual([
-    'chapterClosedTitle', 'chapterClosedTitleWithoutNumber', 'greeting', 'levelUpLine', 'pendingQuizLine',
-    'quizInviteLine',
+    'chapterClosedTitle', 'chapterClosedTitleWithoutNumber', 'chapterUnderstoodTitle', 'greeting',
+    'levelUpLine', 'pendingQuizLine', 'quizInviteLine', 'quizTransitionLine',
     'quizStateLine', 'scoreLine', 'staleBookLine', 'streakLine', 'streakRiskLine',
   ].sort());
 });
@@ -73,6 +77,29 @@ describe('streakLine', () => {
   it('ja leu hoje: nao manda ler de novo, e o numero novo e de amanha (R2, 15/09)', () => {
     expect(streakLine(1, true)).toBe('1 dia seguido. Hoje já conta, amanhã vira 2.');
     expect(streakLine(4, true)).toBe('4 dias seguidos. Hoje já conta, amanhã vira 5.');
+  });
+});
+
+describe('falas do quiz em conversa e do resumo (F5)', () => {
+  it('quota: a cota do mes acabou, sem tratar como erro', () => {
+    expect(quizStateLine('quota', 3)).toEqual({
+      text: 'Seus quizzes do mês acabaram. Sua leitura continua valendo.',
+      cta: 'Conhecer o Premium',
+    });
+  });
+
+  it('transicao entre perguntas de compreensao', () => {
+    expect(quizTransitionLine('comprehension', false)).toBe('Boa. Próxima.');
+  });
+
+  it('antes da reflexao, avisa que nao tem resposta certa', () => {
+    expect(quizTransitionLine('reflection', true)).toBe('Agora a última, e essa não tem resposta certa.');
+    expect(quizTransitionLine('reflection', false)).toBe('Agora uma de reflexão. Essa não tem resposta certa.');
+  });
+
+  it('titulo do resumo com e sem numero do capitulo', () => {
+    expect(chapterUnderstoodTitle(4)).toBe('Capítulo 4, entendido.');
+    expect(chapterUnderstoodTitle(null)).toBe('Quiz fechado.');
   });
 });
 

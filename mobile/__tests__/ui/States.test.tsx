@@ -81,6 +81,36 @@ describe('EmptyState', () => {
     const { queryByRole } = render(<EmptyState title="T" description="D" />);
     expect(queryByRole('button')).toBeNull();
   });
+
+  it('por padrao desenha as lombadas', () => {
+    const { getByTestId } = render(<EmptyState title="T" description="D" />);
+    expect(getByTestId('empty-spines')).toBeTruthy();
+  });
+
+  it('illustration="none" tira a ilustracao (erro de perfil, sucesso de checkout)', () => {
+    const { queryByTestId } = render(<EmptyState title="T" description="D" illustration="none" />);
+    expect(queryByTestId('empty-spines')).toBeNull();
+  });
+
+  it('aceita ilustracao propria no lugar das lombadas (o Glyph do assistente, na F5)', () => {
+    const { getByText, queryByTestId } = render(
+      <EmptyState title="T" description="D" illustration={<RNText>Orelha</RNText>} />,
+    );
+    expect(getByText('Orelha')).toBeTruthy();
+    expect(queryByTestId('empty-spines')).toBeNull();
+  });
+
+  it('acao secundaria aparece como botao proprio e dispara', () => {
+    const onSecondary = jest.fn();
+    const { getByRole } = render(
+      <EmptyState
+        title="T" description="D" actionLabel="Tentar de novo" onAction={jest.fn()}
+        secondaryLabel="Voltar pro livro" onSecondary={onSecondary}
+      />,
+    );
+    fireEvent.press(getByRole('button', { name: 'Voltar pro livro' }));
+    expect(onSecondary).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Banner', () => {

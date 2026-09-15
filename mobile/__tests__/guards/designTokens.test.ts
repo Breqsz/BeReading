@@ -77,7 +77,6 @@ const EXCECAO_COR = new Set([
   // escritas no sistema antigo. Divida declarada: migram na F6.
   'app/checkout.tsx',
   'app/planos.tsx',
-  'app/quiz/summary.tsx',
 ]);
 
 /**

@@ -3,7 +3,8 @@
 //
 // Duas naturezas de função, dois guards:
 //   - função de usuário (chamada pelo app): o dono da ação é o JWT, nunca o corpo.
-//   - função interna (chamada por outra function ou pelo pg_cron): exige a service_role key.
+//   - função interna (chamada por outra function ou pelo pg_cron): exige uma chave de
+//     servidor (ver `_shared/keys.ts`) ou, só no retry, o `CRON_SECRET`.
 //
 // Ver BER-30. O corpo continua podendo trazer `user_id` (o app manda), mas ele é
 // tratado como afirmação do cliente: se divergir do JWT, a requisição é recusada.
@@ -74,52 +75,48 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * A requisição apresenta a service_role key?
+ * A requisição vem de um chamador interno?
  *
- * Falha fechada — sem a env configurada, a resposta é `false`. Use quando a
- * chamada interna é um *caminho alternativo* e não uma exigência (BER-36: o cron
- * re-avalia respostas na `evaluate-answer`, que para o app segue exigindo JWT).
+ * BER-76: a credencial pode chegar em dois headers. A service_role legada (JWT) vem
+ * em `Authorization: Bearer`; a secret key nova (`sb_secret_…`) só pode vir em
+ * `apikey`, porque a plataforma recusa com "Invalid JWT" chave nova no `Authorization`
+ * de uma Edge Function. Durante a migração, os dois valem.
+ *
+ * O app nunca passa: ele manda a publishable key em `apikey` e o JWT do usuário no
+ * `Authorization`, e nenhum dos dois é chave de servidor.
+ *
+ * Falha fechada — chave vazia ou ausente no ambiente nunca vale, e sem nenhuma
+ * configurada ninguém é interno. BER-36: use direto quando a chamada interna é um
+ * caminho alternativo (o cron re-avalia respostas na `evaluate-answer`).
  */
-export function isServiceRole(
-  authHeader: string | null | undefined,
-  serviceRoleKey: string | null | undefined,
+export function isInternalCaller(
+  headers: Headers,
+  acceptedKeys: ReadonlyArray<string | null | undefined>,
 ): boolean {
-  const token = extractBearer(authHeader);
-  if (!token || !serviceRoleKey) return false;
-  return safeEqual(token, serviceRoleKey);
+  const keys = acceptedKeys.filter((key): key is string => typeof key === 'string' && key.length > 0);
+  if (keys.length === 0) return false;
+
+  const presented = [headers.get('apikey')?.trim(), extractBearer(headers.get('Authorization'))]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+  return presented.some((credential) => keys.some((key) => safeEqual(credential, key)));
 }
 
 /**
- * Guard das funções internas: só passa quem apresenta a service_role key.
- * Falha fechada — sem a env configurada, ninguém entra.
+ * Guard das funções internas: só passa quem apresenta uma das chaves aceitas.
  *
- * @throws AuthError 401
- */
-export function assertServiceRole(
-  authHeader: string | null | undefined,
-  serviceRoleKey: string | null | undefined,
-): void {
-  if (!isServiceRole(authHeader, serviceRoleKey)) {
-    throw new AuthError(401, 'Service role required');
-  }
-}
-
-/**
- * Guard de função interna que aceita mais de uma credencial.
- *
- * BER-69 / BER-33: o pg_cron não usa a chave que as functions recebem — a
- * `SUPABASE_SERVICE_ROLE_KEY` injetada é outra, não o JWT service_role legado que
- * estava gravado em texto puro no cron. O retry aceita também um `CRON_SECRET`
- * próprio, que o cron lê do Vault. Slot vazio ou indefinido nunca vale: falha
- * fechada, como `assertServiceRole`.
+ * O retry aceita também o `CRON_SECRET` que o pg_cron lê do Vault (BER-69/BER-33);
+ * `generate-questions` e `award-badges` aceitam só as chaves de servidor. Na BER-69
+ * se confirmou que a `SUPABASE_SERVICE_ROLE_KEY` injetada nas functions é o mesmo
+ * JWT legado que estava no cron — é essa chave que a BER-76 aposenta.
  *
  * @throws AuthError 401
  */
 export function assertInternalCaller(
-  authHeader: string | null | undefined,
+  headers: Headers,
   acceptedKeys: ReadonlyArray<string | null | undefined>,
 ): void {
-  if (!acceptedKeys.some((key) => isServiceRole(authHeader, key))) {
+  if (!isInternalCaller(headers, acceptedKeys)) {
     throw new AuthError(401, 'Service role required');
   }
 }

@@ -2,7 +2,8 @@
 // Avalia e concede badges ao aluno após cada sessão de leitura.
 // Chamado em segundo plano por register-reading-session.
 import { createServiceClient } from '../_shared/supabase-client.ts';
-import { assertServiceRole, authErrorResponse } from '../_shared/auth.ts';
+import { assertInternalCaller, authErrorResponse } from '../_shared/auth.ts';
+import { internalCallerKeys } from '../_shared/keys.ts';
 
 export interface BadgeCriteria {
   id: string;
@@ -155,13 +156,13 @@ if (import.meta.main) Deno.serve(async (req) => {
     });
   }
 
-  // Função interna (BER-30): quem chama é register-reading-session, com a
-  // service_role key. Não é endpoint de usuário — o user_id do corpo é o alvo
+  // Função interna (BER-30): quem chama é register-reading-session, com uma chave
+  // de servidor (BER-76). Não é endpoint de usuário — o user_id do corpo é o alvo
   // da premiação, definido pelo servidor, não uma identidade alegada.
   try {
-    assertServiceRole(
-      req.headers.get('Authorization'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    assertInternalCaller(
+      req.headers,
+      internalCallerKeys((name) => Deno.env.get(name)),
     );
   } catch (err) {
     return authErrorResponse(err);

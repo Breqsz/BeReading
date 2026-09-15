@@ -146,10 +146,10 @@ async function countAbandoned(supabase: SupabaseClient, now: number): Promise<{ 
 // cópia — o mesmo raciocínio da BER-35 para a lógica pura.
 export async function handler(req: Request): Promise<Response> {
   // Função interna (BER-30): entra o pg_cron, com o CRON_SECRET que lê do Vault, ou
-  // quem tiver a service_role. Ver callers.ts (BER-69 / BER-33).
+  // quem tiver uma chave de servidor. Ver callers.ts (BER-69 / BER-33 / BER-76).
   try {
     assertInternalCaller(
-      req.headers.get('Authorization'),
+      req.headers,
       acceptedCallerKeys((name) => Deno.env.get(name)),
     );
   } catch (err) {

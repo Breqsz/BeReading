@@ -97,8 +97,10 @@ Na prática:
    `resolveUserId(authHeader, bodyUserId, getUser)` de `_shared/auth.ts`; o
    `user_id` do corpo só serve para detectar divergência e recusar com 403. Foi
    o IDOR do BER-30. Função interna (cron, chamada entre functions) usa
-   `assertServiceRole` / `assertInternalCaller` — ambos **falham fechado** sem a
-   env configurada. Mantenha assim.
+   `assertInternalCaller` / `isInternalCaller` com as chaves de `_shared/keys.ts`
+   — **falham fechado** sem chave configurada. Mantenha assim. A secret key nova
+   (`sb_secret_…`, BER-76) só vale no header `apikey`; a service_role legada (JWT)
+   ainda vale no `Authorization` até as chaves legadas serem desativadas.
 
 2. **O cliente pode mentir; valide no servidor.** `streaks`, `student_badges` e
    `answers` são **somente leitura** pela RLS (BER-28) — quem escreve são as

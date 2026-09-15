@@ -15,13 +15,15 @@ const RAIZ = join(__dirname, '..', '..');
  * designTokens.test.ts pro raciocinio completo de por que ela ficava fora
  * antes disso).
  */
-const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app', 'src/features'];
+// src/utils entrou na R3: paywallCopy e planFeatures (src/utils/billing.ts) sao
+// copy que chega na tela, e so as outras duas guardas tratam utils como legado.
+const VIGIADAS_COM_CONTEUDO = ['src/ui', 'src/assistant', 'src/game', 'app', 'src/features', 'src/utils'];
 
 const VIGIADAS = VIGIADAS_COM_CONTEUDO;
 
 /** Pastas do sistema "Luminous Library" anterior, que ainda nao migraram
  * (saem na F6). Lista compartilhada pelas tres guardas deste diretorio. */
-const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types', 'src/utils', 'src/theme'];
+const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types', 'src/theme'];
 
 /**
  * Rodada de correcao 1 (revisao da Tarefa 1): a lista unica
@@ -40,6 +42,8 @@ const EXCECAO_EMOJI = new Set([
   'app/(tabs)/catalogo.tsx',
   'app/book/[id].tsx',
   'app/quiz/[chapterId].tsx',
+  // getScoreConfig: emoji da nota no quiz legado. Sai na F5, com a scoreLine.
+  'src/utils/quizUtils.ts',
 ]);
 
 const EXCECAO_TRAVESSAO = new Set([

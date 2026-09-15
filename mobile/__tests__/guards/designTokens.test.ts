@@ -89,6 +89,9 @@ const EXCECAO_COR = new Set([
 const EXCECAO_TIPOGRAFIA = new Set([...EXCECAO_COR, 'app/(auth)/login.tsx', 'app/(auth)/signup.tsx']);
 
 const EXCECAO_FEEDBACK = new Set([
+  // Permanente: o dialogo do sistema para confirmacao destrutiva (spec secao 8).
+  // O tripwire continua valendo: se o arquivo parar de usar Alert.alert, sai.
+  'src/ui/confirmDestructive.ts',
   'app/(auth)/confirm-email.tsx',
   'app/(auth)/login.tsx',
   'app/(auth)/signup.tsx',

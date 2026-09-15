@@ -18,6 +18,7 @@ export { EmptyState } from './EmptyState';
 export { Banner } from './Banner';
 export type { BannerTone } from './Banner';
 export { ListRow } from './ListRow';
+export { confirmDestructive } from './confirmDestructive';
 export { Card } from './Card';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastOptions } from './Toast';

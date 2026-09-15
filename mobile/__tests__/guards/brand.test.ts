@@ -8,10 +8,10 @@ const VIGIADAS = ['src/ui', 'src/assistant', 'src/game', 'app', 'src/features'];
 
 /**
  * Premium nao tem cor nem simbolo proprio (DESIGN.md secoes 9 e 10). O icone de
- * coroa era a marca do Premium no sistema antigo (PR #27). As tres telas abaixo
- * sao do time e migram na F5 (quiz) e na F6 (planos, checkout).
+ * coroa era a marca do Premium no sistema antigo (PR #27). As duas telas abaixo
+ * sao do time e migram na F6. O quiz saiu da lista na F5.
  */
-const EXCECAO_COROA = new Set(['app/checkout.tsx', 'app/planos.tsx', 'app/quiz/[chapterId].tsx']);
+const EXCECAO_COROA = new Set(['app/checkout.tsx', 'app/planos.tsx']);
 
 const COROA = /\bCrown\b/;
 

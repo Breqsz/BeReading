@@ -77,7 +77,6 @@ const EXCECAO_COR = new Set([
   // escritas no sistema antigo. Divida declarada: migram na F6.
   'app/checkout.tsx',
   'app/planos.tsx',
-  'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
 ]);
 
@@ -103,7 +102,6 @@ const EXCECAO_FEEDBACK = new Set([
   'app/book/[id].tsx',
   'app/checkout.tsx',
   'app/planos.tsx',
-  'app/quiz/[chapterId].tsx',
 ]);
 
 function arquivos(dir: string): string[] {

@@ -47,7 +47,8 @@ const EXCECAO_A11Y = new Set([
   'app/(tabs)/perfil.tsx',
   // app/book/[id].tsx saiu no merge do main de 15/09: o PR #17 (BER-48) deu
   // role e label aos Pressable dos capitulos, e o tripwire acusou.
-  'app/quiz/[chapterId].tsx',
+  // app/quiz/[chapterId].tsx saiu na F5: a rota passou a compor so primitivos
+  // do sistema (QuizConversation, AssistantStateView), com role e label.
 ]);
 
 function arquivos(dir: string): string[] {

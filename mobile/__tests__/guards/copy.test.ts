@@ -41,7 +41,6 @@ const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types
 const EXCECAO_EMOJI = new Set([
   'app/(tabs)/catalogo.tsx',
   'app/book/[id].tsx',
-  'app/quiz/[chapterId].tsx',
   // getScoreConfig: emoji da nota no quiz legado. Sai na F5, com a scoreLine.
   'src/utils/quizUtils.ts',
 ]);
@@ -52,7 +51,6 @@ const EXCECAO_TRAVESSAO = new Set([
   // Telas do time do merge do main de 15/09 (PR #27). Migram na F6.
   'app/checkout.tsx',
   'app/planos.tsx',
-  'app/quiz/[chapterId].tsx',
   'app/quiz/summary.tsx',
 ]);
 

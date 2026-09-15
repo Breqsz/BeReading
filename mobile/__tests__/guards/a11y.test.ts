@@ -43,7 +43,6 @@ const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types
 const EXCECAO_A11Y = new Set([
   'app/(auth)/confirm-email.tsx',
   'app/(auth)/signup.tsx',
-  'app/(tabs)/catalogo.tsx',
   'app/(tabs)/perfil.tsx',
   // app/book/[id].tsx saiu no merge do main de 15/09: o PR #17 (BER-48) deu
   // role e label aos Pressable dos capitulos, e o tripwire acusou.

@@ -39,7 +39,6 @@ const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types
  * tres _layout.tsx nao entram: nao violam nem emoji nem travessao.
  */
 const EXCECAO_EMOJI = new Set([
-  'app/(tabs)/catalogo.tsx',
   // getScoreConfig: emoji da nota no quiz legado. Sai na F5, com a scoreLine.
   'src/utils/quizUtils.ts',
 ]);

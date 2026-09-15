@@ -69,7 +69,6 @@ const EXCECOES_COR = new Set([
  */
 const EXCECAO_COR = new Set([
   'app/(auth)/confirm-email.tsx',
-  'app/(tabs)/catalogo.tsx',
   'app/(tabs)/perfil.tsx',
   // Telas do time que chegaram no merge do main de 15/09 (PR #27, BER-58/61),
   // escritas no sistema antigo. Divida declarada: migram na F6.
@@ -91,7 +90,6 @@ const EXCECAO_FEEDBACK = new Set([
   'app/(auth)/confirm-email.tsx',
   'app/(auth)/login.tsx',
   'app/(auth)/signup.tsx',
-  'app/(tabs)/catalogo.tsx',
   // Merge do main de 15/09: confirmacoes destrutivas do time (sair, excluir
   // conta, tirar da leitura, cancelar assinatura) e o fluxo de planos. Saem
   // quando a R3 trouxer a confirmacao destrutiva do sistema e a F6 migrar as telas.

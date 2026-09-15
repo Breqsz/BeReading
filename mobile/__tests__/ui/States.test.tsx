@@ -6,6 +6,7 @@ import { EmptyState } from '../../src/ui/EmptyState';
 import { Banner, type BannerTone } from '../../src/ui/Banner';
 import { ListRow } from '../../src/ui/ListRow';
 import { MIN_TOUCH, color } from '../../src/theme/tokens';
+import { TONE_COLOR } from '../../src/ui/Text';
 
 // O mock oficial de react-native-reanimated (usado globalmente no
 // jest.setup.ui.js) deixa useReducedMotion de fora de proposito — o proprio
@@ -173,5 +174,21 @@ describe('ListRow', () => {
     const { toJSON } = render(<ListRow title="Capítulo 4" />);
     const linha = StyleSheet.flatten((toJSON() as any).props.style);
     expect(linha.minHeight).toBeGreaterThanOrEqual(MIN_TOUCH);
+  });
+
+  it('tom destrutivo pinta o titulo com a cor de perigo (excluir conta, sair)', () => {
+    const { getByText } = render(<ListRow title="Excluir conta" tone="destructive" onPress={jest.fn()} />);
+    expect(StyleSheet.flatten(getByText('Excluir conta').props.style).color).toBe(TONE_COLOR.danger);
+  });
+
+  it('carregando: anuncia ocupado, mostra indicador e nao dispara de novo', () => {
+    const onPress = jest.fn();
+    const { getByRole, getByTestId } = render(
+      <ListRow title="Excluir conta" tone="destructive" loading onPress={onPress} />,
+    );
+    fireEvent.press(getByRole('button'));
+    expect(onPress).not.toHaveBeenCalled();
+    expect(getByRole('button').props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(getByTestId('list-row-loading')).toBeTruthy();
   });
 });

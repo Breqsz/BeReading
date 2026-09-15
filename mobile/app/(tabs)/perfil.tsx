@@ -5,6 +5,7 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useEntitlementStore } from '../../src/stores/entitlementStore';
 import { useProgressStore } from '../../src/stores/progressStore';
@@ -21,7 +22,7 @@ import {
   BadgeList, BadgeSheet, ClassroomSheet, ConstancyMap, ProfileHeader, StatsRow,
   badgeStatsFrom, constancyWeeks, overallAverage,
 } from '../../src/features/profile';
-import { radius, space } from '../../src/theme/tokens';
+import { color, radius, space } from '../../src/theme/tokens';
 import type { Badge } from '../../src/types/database';
 
 const SEM_STREAK = { current_streak: 0, last_read_date: null as string | null };
@@ -178,6 +179,7 @@ export default function PerfilScreen() {
           <ListRow
             title={plano.title}
             subtitle={plano.lines.join(' · ')}
+            trailing={<ChevronRight size={20} color={color.text3} />}
             onPress={() => router.push('/planos')}
             accessibilityLabel={`${plano.title}. ${plano.lines.join('. ')}. Ver planos.`}
             last
@@ -188,7 +190,12 @@ export default function PerfilScreen() {
       <View style={styles.secao}>
         <Text variant="subhead">Conta</Text>
         {!profile.classroom_id ? (
-          <ListRow title="Entrar em uma turma" subtitle="Com o código do seu professor" onPress={() => setTurmaAberta(true)} />
+          <ListRow
+            title="Entrar em uma turma"
+            subtitle="Com o código do seu professor"
+            trailing={<ChevronRight size={20} color={color.text3} />}
+            onPress={() => setTurmaAberta(true)}
+          />
         ) : null}
         <ListRow title="Sair" tone="destructive" onPress={handleLogout} />
         <ListRow title="Excluir conta" tone="destructive" loading={excluindo} onPress={handleDeleteAccount} last />

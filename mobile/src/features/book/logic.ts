@@ -74,7 +74,7 @@ export function chapterSubtitle(state: ChapterState): string {
     case 'quiz':
       return 'Responder o quiz';
     case 'reading':
-      return `faltam ${state.pagesLeft} pág.`;
+      return `${state.pagesLeft === 1 ? 'falta' : 'faltam'} ${state.pagesLeft} pág.`;
     case 'locked':
       return `Leia até a p. ${state.endPage} pro quiz abrir`;
     case 'open':

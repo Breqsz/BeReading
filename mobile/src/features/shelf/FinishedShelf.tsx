@@ -1,5 +1,6 @@
 // Prateleira de lidos (spec 7.7): capas em grade, com a media do livro quando
 // ha nota. Sem trofeu nem dourado: terminar um livro e o proprio premio.
+// Layout no View interno, nao no `style` em funcao do Pressable (ver ShelfBookRow).
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Cover, Text } from '../../ui';
 import { space } from '../../theme/tokens';
@@ -24,11 +25,12 @@ export function FinishedShelf({ items, onPressBook }: Props) {
           accessibilityRole="button"
           accessibilityLabel={`Abrir ${book.title}, de ${book.author}.${average === null ? '' : ` Média ${average}.`}`}
           onPress={() => onPressBook(book.id)}
-          style={({ pressed }) => [styles.item, pressed ? styles.pressed : null]}
         >
-          <Cover book={book} size="sm" />
-          <Text variant="caption" numberOfLines={2}>{book.title}</Text>
-          {average === null ? null : <Text variant="caption" tone="secondary">{`média ${average}`}</Text>}
+          <View style={styles.item}>
+            <Cover book={book} size="sm" />
+            <Text variant="caption" numberOfLines={2}>{book.title}</Text>
+            {average === null ? null : <Text variant="caption" tone="secondary">{`média ${average}`}</Text>}
+          </View>
         </Pressable>
       ))}
     </View>
@@ -38,5 +40,4 @@ export function FinishedShelf({ items, onPressBook }: Props) {
 const styles = StyleSheet.create({
   grade: { flexDirection: 'row', flexWrap: 'wrap', gap: space.lg },
   item: { width: 74, gap: space.xs },
-  pressed: { opacity: 0.7 },
 });

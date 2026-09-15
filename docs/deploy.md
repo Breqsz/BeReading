@@ -209,9 +209,12 @@ testar a mesma cópia num Supabase local (passos 1 a 4 abaixo, trocando o destin
      $$
    );
    ```
-   **Não use o bloco de cron da migration baseline** (`20260910210000_...`): ele ainda lê o
-   segredo antigo `cron_service_role_key`, e o comando em produção foi alterado depois (BER-33).
-   O SQL acima é o que roda em produção em 15/09/2026.
+   A fonte do comando do cron é a migration `20260915130000_ber84_cron_retry_reads_vault.sql`
+   (BER-84); o SQL acima é o mesmo. Ele precisa ser rodado à mão aqui porque migrations não rodam
+   numa restauração de backup. **Não use o bloco de cron da migration baseline**
+   (`20260910210000_...`): ele é anterior à BER-33 e lê o segredo antigo `cron_service_role_key`.
+   Os valores dos segredos (URL e `CRON_SECRET`) nunca ficam em arquivo; ver também
+   `supabase/runbooks/ber-33-cron-vault.sql` para criação e rotação.
 7. Confira:
    - contagens principais (`auth.users`, `profiles`, `reading_sessions`, `answers`, `subscriptions`)
      iguais às de produção no horário da cópia;

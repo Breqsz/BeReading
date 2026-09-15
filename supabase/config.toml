@@ -417,7 +417,7 @@ verify_jwt = false
 [functions.reading-list]
 verify_jwt = false
 
-# Cobrança simulada — só liga com o secret BILLING_MODE=mock; sem ele, recusa tudo (BER-85).
+# Cobrança simulada — só liga com o secret BILLING_MODE=mock.
 [functions.billing-mock]
 verify_jwt = false
 

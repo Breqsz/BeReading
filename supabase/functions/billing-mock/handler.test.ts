@@ -9,7 +9,6 @@ const USER_ID = 'user-1';
 function withEnv(url: string) {
   Deno.env.set('SUPABASE_URL', url);
   Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key-teste');
-  // BER-85: o mock só liga com o secret explícito.
   Deno.env.set('BILLING_MODE', 'mock');
 }
 

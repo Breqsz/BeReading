@@ -116,6 +116,28 @@ jobs:
             -f /tmp/restore/data.sql > /dev/null
 
           FAIL=0
+
+          # O schema.sql exclui o schema auth, e com ele o trigger on_auth_user_created.
+          # Recria como manda o runbook e prova que um cadastro novo ganha perfil —
+          # contagem de linhas sozinha não pega isso (achado no restore manual de 15/09/2026).
+          docker exec "$DB" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q -c \
+            "create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();"
+          profiles_created=$(docker exec -i "$DB" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq <<'SQL' | tail -1
+          begin;
+          insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+          values ('00000000-0000-4000-8000-00000000beef', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+                  'teste-restauracao@example.invalid', '', now(), '{"display_name":"Teste Restauracao"}', now(), now());
+          select count(*) from public.profiles where user_id = '00000000-0000-4000-8000-00000000beef';
+          rollback;
+          SQL
+          )
+          if [ "$profiles_created" = "1" ]; then
+            echo "cadastro novo cria perfil após restaurar: confere"
+          else
+            echo "::error::cadastro novo não cria perfil no banco restaurado (trigger on_auth_user_created)"
+            FAIL=1
+          fi
+
           for t in $CHECK_TABLES; do
             restored=$(docker exec "$DB" psql -U postgres -d postgres -Atqc "select count(*) from $t")
             before=$(cat "$RUNNER_TEMP/check/before_$t")

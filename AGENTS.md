@@ -17,7 +17,8 @@ que o projeto é e como rodar; `docs/deploy.md` explica como as coisas vão ao a
 O aluno registra as páginas que leu. Ao cobrir um capítulo, uma IA gera 4
 perguntas (compreensão + reflexão); o aluno responde em texto; outra IA dá nota
 e feedback. Streaks e medalhas gamificam. Plano gratuito tem limite de IA;
-`Pro` libera (BER-58/61, cobrança **simulada** — não há gateway real).
+`Premium` libera (BER-58/61, `PREMIUM_PLAN` em `_shared/plan-rules.ts`; cobrança
+**simulada** — não há gateway real).
 
 Produto é **B2C** desde 31/08/2026 (BER-52). O schema ainda carrega as tabelas
 da fase escolar (`schools`, `classrooms`, `teachers`, `classroom_books`,
@@ -101,9 +102,13 @@ Na prática:
 
 2. **O cliente pode mentir; valide no servidor.** `streaks`, `student_badges` e
    `answers` são **somente leitura** pela RLS (BER-28) — quem escreve são as
-   Edge Functions com `service_role`. `student_books` aceita só o insert/update
-   exato de "comecei a ler" (`status='reading'`, `current_page=1`); todo avanço
-   passa por `register-reading-session`. Se você adicionar estado de
+   Edge Functions com `service_role`. `student_books` também é somente leitura
+   para o cliente desde a BER-58: a migration `20260915120000_ber61_subscriptions.sql`
+   removeu as policies de "comecei a ler", porque com elas o limite de livros do
+   plano gratuito seria só visual (verificado em produção em 2026-09-15: só resta
+   `student_books_read`, de SELECT). Começar e tirar livro da leitura passa pela
+   Edge Function `reading-list`, que aplica a cota; todo avanço de página passa
+   por `register-reading-session`. Se você adicionar estado de
    gamificação, ele nasce com essa mesma forma: escrita só no servidor.
 
 3. **Trabalho em segundo plano usa `dispatchBackground()`** (`_shared/background.ts`),

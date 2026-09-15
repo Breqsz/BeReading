@@ -62,7 +62,7 @@ supabase secrets set AI_PROVIDER=anthropic ANTHROPIC_API_KEY=<sk-ant-...> --proj
   ```
 
 - **Premium:** R$ 24,90/mês, sem limites. Quem aplica os limites é o servidor (`evaluate-answer`, `reading-list` e `register-reading-session`). O app só mostra o que `get-entitlement` devolve.
-- ⚠️ **A cobrança é simulada.** O `billing-mock` assina, cancela e retoma sem cobrar nada, e grava `provider = 'mock'` em `subscriptions`. Enquanto isso valer, **qualquer usuário logado consegue virar Premium**. O mock desliga com `BILLING_MODE` diferente de `mock`. A troca pela compra in-app real está na **BER-79**.
+- ⚠️ **A cobrança é simulada.** O `billing-mock` assina, cancela e retoma sem cobrar nada, e grava `provider = 'mock'` em `subscriptions`. Enquanto isso valer, **qualquer usuário logado consegue virar Premium**. O mock **só liga com o secret `BILLING_MODE=mock`**; sem o secret, ou com outro valor, a function recusa tudo (BER-85). A troca pela compra in-app real está na **BER-79**.
 
 ## Deploy
 

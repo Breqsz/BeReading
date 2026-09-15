@@ -6,8 +6,7 @@
 // em `subscriptions` exatamente o que a integração real vai gravar, só que com
 // `provider = 'mock'` — o resto do sistema (limites, app) não distingue os dois.
 //
-// Desliga com `BILLING_MODE` diferente de `mock`: a partir daí esta function
-// recusa tudo. A remoção definitiva e a compra in-app real estão na BER-79.
+// Só liga com `BILLING_MODE=mock`; sem o secret ou com outro valor, recusa tudo.
 import { createServiceClient } from '../_shared/supabase-client.ts';
 import { authErrorResponse, resolveUserId } from '../_shared/auth.ts';
 import { loadEntitlement, loadSubscription, toEntitlementView } from '../_shared/entitlement.ts';
@@ -25,7 +24,7 @@ export async function handler(req: Request): Promise<Response> {
     return json({ error: 'Method not allowed' }, 405);
   }
 
-  if ((Deno.env.get('BILLING_MODE') ?? 'mock') !== 'mock') {
+  if (Deno.env.get('BILLING_MODE') !== 'mock') {
     return json({ error: 'Mock billing disabled' }, 403);
   }
 

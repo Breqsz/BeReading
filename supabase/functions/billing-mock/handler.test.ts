@@ -9,7 +9,7 @@ const USER_ID = 'user-1';
 function withEnv(url: string) {
   Deno.env.set('SUPABASE_URL', url);
   Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key-teste');
-  Deno.env.delete('BILLING_MODE');
+  Deno.env.set('BILLING_MODE', 'mock');
 }
 
 function request(body: unknown, token: string | null = TOKEN): Request {
@@ -141,6 +141,24 @@ Deno.test('billing-mock: com BILLING_MODE diferente de mock, recusa tudo e não 
     assertEquals(fake.tables.subscriptions.length, 0);
   } finally {
     Deno.env.delete('BILLING_MODE');
+    await fake.close();
+  }
+});
+
+Deno.test('billing-mock: sem o secret BILLING_MODE, recusa tudo e não grava nada (BER-85)', async () => {
+  const fake = startFakeSupabase({
+    users: { [TOKEN]: { id: USER_ID } },
+    tables: { subscriptions: [] },
+  });
+  withEnv(fake.url);
+  Deno.env.delete('BILLING_MODE');
+
+  try {
+    const { handler } = await import('./index.ts');
+    const res = await handler(request({ action: 'subscribe', plan_id: 'premium_monthly' }));
+    assertEquals(res.status, 403);
+    assertEquals(fake.tables.subscriptions.length, 0);
+  } finally {
     await fake.close();
   }
 });

@@ -57,11 +57,18 @@ export default function RootLayout() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (cancelled) return;
       setSession(session);
       if (session) {
-        await hydrateProfile(session);
+        // O supabase-js roda este callback dentro de uma trava exclusiva, e o
+        // perfil é outra chamada ao Supabase, que espera a mesma trava. Com
+        // await aqui dentro, a renovação de token na abertura travava o app com
+        // a splash na tela (R2, 15/09). O setTimeout tira o carregamento de
+        // dentro da trava, como a doc do auth-js recomenda.
+        setTimeout(() => {
+          if (!cancelled) void hydrateProfile(session);
+        }, 0);
       } else {
         clear();
         // BER-61: o plano do leitor anterior não pode vazar para o próximo login.

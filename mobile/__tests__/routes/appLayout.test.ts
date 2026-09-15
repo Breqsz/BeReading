@@ -66,6 +66,16 @@ describe('app/_layout.tsx: apresentacao das rotas', () => {
     expect(codigo).toContain('if (fontsLoaded && isInitialized) {');
     expect(codigo).toContain('SplashScreen.hideAsync().catch(() => {});');
   });
+
+  // O supabase-js roda o callback de onAuthStateChange dentro de uma trava
+  // exclusiva. Callback async que espera outra chamada ao Supabase (o perfil)
+  // trava o app quando o token e renovado na abertura: a splash nunca sai.
+  // Visto no emulador em 15/09 (R2); a doc do auth-js 2.103 marca essa
+  // assinatura como deprecated por isso.
+  it('onAuthStateChange nao recebe callback async (deadlock da trava do auth)', () => {
+    expect(codigo).toMatch(/onAuthStateChange\(\s*\(/);
+    expect(codigo).not.toMatch(/onAuthStateChange\(\s*async/);
+  });
 });
 
 describe('app/(tabs)/_layout.tsx: rotulos e TabBar novo', () => {

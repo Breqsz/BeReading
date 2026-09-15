@@ -7,6 +7,12 @@ import { join } from 'path';
  */
 const RAIZ = join(__dirname, '..', '..');
 
+/** it.each nao aceita lista vazia. Quando a divida de uma lista zera, registra so isso. */
+function cadaExcecao(lista: string[]): (nome: string, fn: (rel: string) => void) => void {
+  if (lista.length > 0) return it.each(lista) as unknown as (nome: string, fn: (rel: string) => void) => void;
+  return (nome: string) => it(nome.replace('%s', 'lista vazia'), () => {});
+}
+
 /**
  * Pastas onde o sistema novo ja vale, e que hoje tem pelo menos um arquivo
  * real. src/components e app/(tabs) entram conforme migram.
@@ -67,11 +73,7 @@ const EXCECOES_COR = new Set([
  * app/(tabs)/_layout.tsx (tambem tocados na F3) tambem ficam de fora: nenhum
  * tinha cor, fontSize ou Alert.alert literal de verdade.
  */
-const EXCECAO_COR = new Set([
-  // Telas do time que chegaram no merge do main de 15/09 (PR #27, BER-58/61),
-  // escritas no sistema antigo. Divida declarada: migram na F6.
-  'app/checkout.tsx',
-  'app/planos.tsx',
+const EXCECAO_COR = new Set<string>([
 ]);
 
 /**
@@ -79,17 +81,12 @@ const EXCECAO_COR = new Set([
  * login.tsx e signup.tsx nao tem cor literal, mas tem fontSize/fontFamily
  * solto.
  */
-const EXCECAO_TIPOGRAFIA = new Set([...EXCECAO_COR]);
+const EXCECAO_TIPOGRAFIA = new Set<string>([...EXCECAO_COR]);
 
-const EXCECAO_FEEDBACK = new Set([
+const EXCECAO_FEEDBACK = new Set<string>([
   // Permanente: o dialogo do sistema para confirmacao destrutiva (spec secao 8).
   // O tripwire continua valendo: se o arquivo parar de usar Alert.alert, sai.
   'src/ui/confirmDestructive.ts',
-  // Merge do main de 15/09: confirmacoes destrutivas do time (sair, excluir
-  // conta, tirar da leitura, cancelar assinatura) e o fluxo de planos. Saem
-  // quando a R3 trouxer a confirmacao destrutiva do sistema e a F6 migrar as telas.
-  'app/checkout.tsx',
-  'app/planos.tsx',
 ]);
 
 function arquivos(dir: string): string[] {
@@ -178,7 +175,7 @@ describe('guarda: feedback', () => {
  * assim que um arquivo listado deixar de existir.
  */
 describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
-  it.each([...EXCECAO_COR, ...EXCECAO_TIPOGRAFIA, ...EXCECAO_FEEDBACK].filter((v, i, arr) => arr.indexOf(v) === i))(
+  cadaExcecao([...EXCECAO_COR, ...EXCECAO_TIPOGRAFIA, ...EXCECAO_FEEDBACK].filter((v, i, arr) => arr.indexOf(v) === i))(
     'excecao %s ainda existe',
     (rel) => {
       expect(existsSync(join(RAIZ, rel))).toBe(true);
@@ -198,7 +195,7 @@ describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
  * ficou limpa.
  */
 describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', () => {
-  it.each([...EXCECAO_COR])('%s: tripwire EXCECAO_COR ainda tem cor literal fora dos tokens', (rel) => {
+  cadaExcecao([...EXCECAO_COR])('%s: tripwire EXCECAO_COR ainda tem cor literal fora dos tokens', (rel) => {
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     const achados = codigo.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [];
     if (achados.length === 0) {
@@ -208,7 +205,7 @@ describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', ()
     }
   });
 
-  it.each([...EXCECAO_TIPOGRAFIA])('%s: tripwire EXCECAO_TIPOGRAFIA ainda tem fontSize ou fontFamily literal', (rel) => {
+  cadaExcecao([...EXCECAO_TIPOGRAFIA])('%s: tripwire EXCECAO_TIPOGRAFIA ainda tem fontSize ou fontFamily literal', (rel) => {
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     const violaFontSize = /fontSize:\s*\d/.test(codigo);
     const violaFontFamily = /fontFamily:\s*['"]/.test(codigo);
@@ -219,7 +216,7 @@ describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', ()
     }
   });
 
-  it.each([...EXCECAO_FEEDBACK])('%s: tripwire EXCECAO_FEEDBACK ainda usa Alert.alert', (rel) => {
+  cadaExcecao([...EXCECAO_FEEDBACK])('%s: tripwire EXCECAO_FEEDBACK ainda usa Alert.alert', (rel) => {
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     if (!/Alert\.alert/.test(codigo)) {
       throw new Error(

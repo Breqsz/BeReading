@@ -3,6 +3,12 @@ import { join } from 'path';
 
 const RAIZ = join(__dirname, '..', '..');
 
+/** it.each nao aceita lista vazia. Quando a divida de uma lista zera, registra so isso. */
+function cadaExcecao(lista: string[]): (nome: string, fn: (rel: string) => void) => void {
+  if (lista.length > 0) return it.each(lista) as unknown as (nome: string, fn: (rel: string) => void) => void;
+  return (nome: string) => it(nome.replace('%s', 'lista vazia'), () => {});
+}
+
 /**
  * Pastas onde o sistema novo ja vale, e que hoje tem pelo menos um arquivo
  * real.
@@ -38,15 +44,12 @@ const LEGADO = ['src/components', 'src/api', 'src/lib', 'src/stores', 'src/types
  * chapter-complete.tsx, register-reading.tsx (reescrito na F4 Tarefa 5) e os
  * tres _layout.tsx nao entram: nao violam nem emoji nem travessao.
  */
-const EXCECAO_EMOJI = new Set([
+const EXCECAO_EMOJI = new Set<string>([
   // getScoreConfig: emoji da nota no quiz legado. Sai na F5, com a scoreLine.
   'src/utils/quizUtils.ts',
 ]);
 
-const EXCECAO_TRAVESSAO = new Set([
-  // Telas do time do merge do main de 15/09 (PR #27). Migram na F6.
-  'app/checkout.tsx',
-  'app/planos.tsx',
+const EXCECAO_TRAVESSAO = new Set<string>([
 ]);
 
 /**
@@ -112,7 +115,7 @@ describe('guarda: copy', () => {
  * tela que ja migrou ou sumiu (lixo que finge cobertura).
  */
 describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
-  it.each([...EXCECAO_EMOJI, ...EXCECAO_TRAVESSAO].filter((v, i, arr) => arr.indexOf(v) === i))(
+  cadaExcecao([...EXCECAO_EMOJI, ...EXCECAO_TRAVESSAO].filter((v, i, arr) => arr.indexOf(v) === i))(
     'excecao %s ainda existe',
     (rel) => {
       expect(existsSync(join(RAIZ, rel))).toBe(true);
@@ -128,7 +131,7 @@ describe('guarda: excecao desta guarda nao aponta pra arquivo fantasma', () => {
  * — o mesmo mecanismo que ja falhou nesta branch.
  */
 describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', () => {
-  it.each([...EXCECAO_EMOJI])('%s: tripwire EXCECAO_EMOJI ainda tem emoji', (rel) => {
+  cadaExcecao([...EXCECAO_EMOJI])('%s: tripwire EXCECAO_EMOJI ainda tem emoji', (rel) => {
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     if (!EMOJI.test(codigo)) {
       throw new Error(
@@ -137,7 +140,7 @@ describe('guarda: excecao desta guarda so cobre arquivo que realmente viola', ()
     }
   });
 
-  it.each([...EXCECAO_TRAVESSAO])('%s: tripwire EXCECAO_TRAVESSAO ainda tem travessao em codigo', (rel) => {
+  cadaExcecao([...EXCECAO_TRAVESSAO])('%s: tripwire EXCECAO_TRAVESSAO ainda tem travessao em codigo', (rel) => {
     const codigo = linhasDeCodigo(readFileSync(join(RAIZ, rel), 'utf8')).join('\n');
     if (!TRAVESSAO.test(codigo)) {
       throw new Error(

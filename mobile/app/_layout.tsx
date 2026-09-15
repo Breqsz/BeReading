@@ -12,6 +12,12 @@ import { useAppFonts } from '../src/theme/fonts';
 import { color } from '../src/theme/tokens';
 import { ToastProvider } from '../src/ui/Toast';
 
+// Rota aberta direto (link bereading://, Expo Go restaurando a última tela)
+// virava a primeira da pilha: o sheet de registro sem nada atrás e sem saída
+// (R2, 15/09). O anchor põe as abas embaixo de qualquer rota aberta assim, então
+// a Hoje sempre está na pilha.
+export const unstable_settings = { anchor: '(tabs)' };
+
 // A splash fica até fonte e sessão estarem prontas. Sem isso, o app pisca uma
 // tela vazia entre a splash e a primeira rota — num app escuro, isso aparece.
 SplashScreen.preventAutoHideAsync().catch(() => {});

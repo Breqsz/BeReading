@@ -76,6 +76,14 @@ describe('app/_layout.tsx: apresentacao das rotas', () => {
     expect(codigo).toMatch(/onAuthStateChange\(\s*\(/);
     expect(codigo).not.toMatch(/onAuthStateChange\(\s*async/);
   });
+
+  // Rota aberta sozinha (link direto, Expo Go restaurando a ultima tela) virava
+  // a primeira da pilha: o sheet de registro sem nada atras e sem saida (R2,
+  // 15/09). O anchor poe as abas embaixo de qualquer rota aberta direto, entao
+  // a Hoje sempre esta na pilha.
+  it("declara anchor '(tabs)': a Hoje fica embaixo de rota aberta direto", () => {
+    expect(codigo).toMatch(/export const unstable_settings\s*=\s*\{\s*anchor:\s*'\(tabs\)'/);
+  });
 });
 
 describe('app/(tabs)/_layout.tsx: rotulos e TabBar novo', () => {

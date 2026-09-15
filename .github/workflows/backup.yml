@@ -11,9 +11,6 @@ on:
   schedule:
     - cron: "0 6 * * *" # 03:00 em São Paulo, horário de pouco uso
   workflow_dispatch:
-  # TEMPORÁRIO (BER-83): permite testar antes do merge. Remover antes de mergear.
-  push:
-    branches: [feat/ber-83-db-backup]
 
 concurrency:
   group: backup-production

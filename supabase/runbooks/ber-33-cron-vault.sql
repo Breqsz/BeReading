@@ -12,6 +12,13 @@
 -- migrations/…0004_pg_cron.sql descreve um job com GUC que nunca foi o que rodou. Rodar à mão, uma vez, no SQL Editor ou via
 -- `supabase db query --linked --project-ref <ref>`, NESTA ORDEM.
 --
+-- ATUALIZAÇÃO (BER-84, 15/09/2026): o AGENDAMENTO (passo B) passou a viver na migration
+-- 20260915130000_ber84_cron_retry_reads_vault.sql, com este mesmo comando. A baseline
+-- (BER-31) já agendava o job, só que com o segredo antigo; manter o comando só aqui
+-- deixava todo ambiente criado pelas migrations com o retry recebendo 401.
+-- Este runbook continua valendo para os SEGREDOS (passo A), a conferência (C/D) e a
+-- rotação do CRON_SECRET, que nunca vão para migration.
+--
 -- Antes do SQL (fora do banco):
 --   1. Gerar o segredo:                    openssl rand -hex 32
 --   2. Gravar nas functions:               supabase secrets set CRON_SECRET=<valor> --project-ref <ref>

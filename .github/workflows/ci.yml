@@ -34,6 +34,16 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      # BER-89: `typedRoutes` só verifica string de rota se `.expo/types/router.d.ts`
+      # existir, e ele é gitignored. Sem este passo, o `tsc` aceitava qualquer rota.
+      # `expo customize tsconfig.json` gera os tipos sem subir o Metro; o `test -s`
+      # reprova o job se uma versão futura do Expo deixar de gerar o arquivo, em vez
+      # de o type-check voltar a passar verde por omissão.
+      - name: Gerar tipos das rotas (typedRoutes)
+        run: |
+          npx expo customize tsconfig.json
+          test -s .expo/types/router.d.ts
+
       - name: Type-check
         run: npx tsc --noEmit
 

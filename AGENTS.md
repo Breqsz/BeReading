@@ -182,6 +182,7 @@ Na prática:
 
 | Preciso de… | Vá para |
 |---|---|
+| O que construir, para quem, e o que **não** construir | `docs/product.md` |
 | Rodar o app, stack, secrets de IA | `README.md` |
 | Implantar, secrets do Actions, backup/restauração, troubleshooting | `docs/deploy.md` |
 | Build e distribuição do app | `docs/mobile-build.md` |

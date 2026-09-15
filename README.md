@@ -4,6 +4,10 @@ App de leitura gamificada com IA. O aluno registra o que leu; ao completar um ca
 uma IA gera perguntas de **compreensão** e **reflexão** sobre o livro e avalia as
 respostas com nota + feedback — no tom de companheiro de leitura, não de prova.
 
+Contexto de produto — posicionamento, público, o que está fora de escopo e por quê:
+[`docs/product.md`](docs/product.md). Regras para quem edita o repositório (pessoa ou
+agente de IA): [`AGENTS.md`](AGENTS.md).
+
 ## Arquitetura
 
 - **`mobile/`** — app **Expo / React Native** (expo-router, Zustand, NativeWind/Tailwind, `@supabase/supabase-js`).

@@ -12,7 +12,7 @@ const TRAVESSAO = /[—–]/;
 
 const TODAS = [
   greeting(),
-  streakLine(4), streakLine(0), streakLine(1),
+  streakLine(4), streakLine(0), streakLine(1), streakLine(4, true),
   streakRiskLine(3),
   chapterClosedTitle([4]), chapterClosedTitle([4, 5]),
   chapterClosedTitleWithoutNumber(1), chapterClosedTitleWithoutNumber(3),
@@ -68,6 +68,11 @@ describe('streakLine', () => {
 
   it('sem sequencia, convida a comecar sem cobrar', () => {
     expect(streakLine(0)).toBe('Bora começar uma sequência? Uma página já conta.');
+  });
+
+  it('ja leu hoje: nao manda ler de novo, e o numero novo e de amanha (R2, 15/09)', () => {
+    expect(streakLine(1, true)).toBe('1 dia seguido. Hoje já conta, amanhã vira 2.');
+    expect(streakLine(4, true)).toBe('4 dias seguidos. Hoje já conta, amanhã vira 5.');
   });
 });
 

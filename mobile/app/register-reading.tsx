@@ -65,7 +65,13 @@ export default function RegisterReadingScreen() {
   // de status e de um jeito de sair, senao o leitor fica preso (R2, 15/09).
   const raiz = !router.canGoBack();
   const bordas: ('top' | 'bottom')[] = raiz ? ['top', 'bottom'] : ['bottom'];
-  const fechar = raiz && !sending ? () => router.replace('/') : undefined;
+  // A seta continua no cabecalho durante o envio e so nao age: tira-la no meio
+  // do envio fazia o conteudo pular para cima (R2, 15/09).
+  const fechar = raiz
+    ? () => {
+        if (!enviando.current) router.replace('/');
+      }
+    : undefined;
 
   // BER-44: sem a lista, o sheet ainda oferece o livro que a Hoje tinha aberto.
   // Lido por ref para uma mudanca no store nao refazer a busca e apagar o que ja

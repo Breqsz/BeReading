@@ -14,9 +14,14 @@ export function greeting(): string {
   return 'E aí,';
 }
 
-export function streakLine(streak: number): string {
+/**
+ * `readToday`: ja tem leitura registrada hoje. Sem ele, a fala mandava ler
+ * hoje quem ja tinha lido, e prometia um numero que so vira amanha (R2, 15/09).
+ */
+export function streakLine(streak: number, readToday = false): string {
   if (streak <= 0) return 'Bora começar uma sequência? Uma página já conta.';
   const dias = streak === 1 ? '1 dia seguido' : `${streak} dias seguidos`;
+  if (readToday) return `${dias}. Hoje já conta, amanhã vira ${streak + 1}.`;
   return `${dias}. Lê hoje e vira ${streak + 1}.`;
 }
 

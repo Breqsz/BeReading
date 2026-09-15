@@ -383,6 +383,19 @@ describe('registrar leitura: resultado', () => {
     expect(queryByRole('button', { name: 'Voltar' })).toBeNull();
   });
 
+  it('aberto como primeira tela e enviando: "Voltar" continua no lugar, mas nao sai (conteudo nao pula) (R2)', async () => {
+    mockCanGoBack = false;
+    mRegister.mockImplementation(() => new Promise(() => {}));
+
+    const { getByLabelText, getByRole } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '96');
+    fireEvent.press(getByRole('button', { name: 'Registrar 12 páginas' }));
+
+    await waitFor(() => expect(mRegister).toHaveBeenCalled());
+    fireEvent.press(getByRole('button', { name: 'Voltar' }));
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   it('sem capitulo fechado: espera o refresh, fecha o sheet e mostra toast com paginas, XP e sequencia', async () => {
     let liberarRefresh: () => void = () => {};
     mockRefresh.mockImplementation(() => new Promise<void>((res) => { liberarRefresh = res; }));

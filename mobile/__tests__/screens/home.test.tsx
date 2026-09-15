@@ -340,6 +340,39 @@ describe('Hoje: card do assistente', () => {
   });
 });
 
+// Visto no emulador em 15/09 (R2): depois de registrar a leitura do dia, a Hoje
+// ainda dizia "Lê hoje e vira 2", mandando ler quem ja tinha lido.
+describe('Hoje: fala da sequencia', () => {
+  it('ja leu hoje: nao manda ler de novo, e o numero novo e de amanha', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T14:00:00.000Z')); // 11h em Sao Paulo
+
+    const b = book();
+    mGetStudentBooks.mockResolvedValue([entry({ current_page: 84 }, b)]);
+    mLoadPendingQuizzes.mockResolvedValue([]);
+    mGetStreak.mockResolvedValue(streak({ current_streak: 4, last_read_date: '2026-09-13' }));
+    mGetReadingSessions.mockResolvedValue([sessao({ read_at: '2026-09-13T12:00:00.000Z' })]);
+
+    const { findByText, queryByText } = render(<HomeScreen />);
+    expect(await findByText('4 dias seguidos. Hoje já conta, amanhã vira 5.')).toBeTruthy();
+    expect(queryByText(/Lê hoje/)).toBeNull();
+  });
+
+  it('ainda nao leu hoje: convida a ler hoje', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T14:00:00.000Z')); // 11h em Sao Paulo: sem risco de sequencia
+
+    const b = book();
+    mGetStudentBooks.mockResolvedValue([entry({ current_page: 84 }, b)]);
+    mLoadPendingQuizzes.mockResolvedValue([]);
+    mGetStreak.mockResolvedValue(streak({ current_streak: 4, last_read_date: '2026-09-12' }));
+    mGetReadingSessions.mockResolvedValue([sessao({ read_at: '2026-09-12T12:00:00.000Z' })]);
+
+    const { findByText } = render(<HomeScreen />);
+    expect(await findByText('4 dias seguidos. Lê hoje e vira 5.')).toBeTruthy();
+  });
+});
+
 describe('Hoje: fileira "Também lendo"', () => {
   it('aparece com dois livros ou mais em leitura', async () => {
     const b1 = book({ id: 'b1', title: 'Livro Um' });

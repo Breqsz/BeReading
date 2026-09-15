@@ -197,7 +197,7 @@ export default function HomeScreen() {
     <Screen refreshing={refreshing} onRefresh={onRefresh} contentStyle={styles.content}>
       {banner}
       {header}
-      <StreakWeek days={weekDays(sessions)} streakText={streakLine(streakEfetiva)} />
+      <StreakWeek days={weekDays(sessions)} streakText={streakLine(streakEfetiva, leuHoje)} />
 
       <CurrentBookHero
         book={atual.book}

@@ -1,3 +1,4 @@
+export { AssistantStateView } from './AssistantStateView';
 export { ChatBubble } from './ChatBubble';
 export { Composer } from './Composer';
 export { QuizConversation } from './QuizConversation';

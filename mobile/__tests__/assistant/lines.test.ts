@@ -88,6 +88,10 @@ describe('falas do quiz em conversa e do resumo (F5)', () => {
     });
   });
 
+  it('polling sem numero do capitulo: nao inventa "capitulo 0"', () => {
+    expect(quizStateLine('polling', null).text).toBe('Tô relendo o capítulo pra montar suas perguntas.');
+  });
+
   it('transicao entre perguntas de compreensao', () => {
     expect(quizTransitionLine('comprehension', false)).toBe('Boa. Próxima.');
   });

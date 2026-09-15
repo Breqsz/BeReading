@@ -73,11 +73,16 @@ export type QuizStateKey = 'polling' | 'still-generating' | 'no-content' | 'fail
  */
 export function quizStateLine(
   state: QuizStateKey,
-  chapterNumber: number,
+  /** `null` quando a tela ainda nao sabe o numero: a fala nao inventa um. */
+  chapterNumber: number | null,
 ): { text: string; cta?: string } {
   switch (state) {
     case 'polling':
-      return { text: `Tô relendo o capítulo ${chapterNumber} pra montar suas perguntas.` };
+      return {
+        text: chapterNumber === null
+          ? 'Tô relendo o capítulo pra montar suas perguntas.'
+          : `Tô relendo o capítulo ${chapterNumber} pra montar suas perguntas.`,
+      };
     case 'still-generating':
       return {
         text: 'Tá demorando mais que o normal. Sua leitura já tá salva, e eu te aviso na Hoje quando ficar pronto.',

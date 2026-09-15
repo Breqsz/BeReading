@@ -22,7 +22,7 @@ Pré-requisitos: Node ≥ 20, app **Expo Go** no celular (iOS/Android), celular 
 2. Crie `mobile/.env` (gitignored) apontando para o backend na nuvem:
    ```
    EXPO_PUBLIC_SUPABASE_URL=https://<seu-projeto>.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key — Supabase Dashboard → Project Settings → API>
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=<publishable key, sb_publishable_… — Supabase Dashboard → Project Settings → API Keys>
    ```
 3. `npm install`
    *(o `mobile/.npmrc` já habilita `legacy-peer-deps`, necessário pelo conflito de peer dep React 19 × `lucide-react-native`).*

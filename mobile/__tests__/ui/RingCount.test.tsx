@@ -1,256 +1,226 @@
+import { useEffect } from 'react';
 import { render, act } from '@testing-library/react-native';
 import { Text as RNText } from 'react-native';
+import { Circle } from 'react-native-svg';
 
-// Estado counting do Ring (DESIGN.md secao 5, F4-21). Arquivo separado de
-// Progress.test.tsx de proposito: aquele arquivo nao mocka useReducedMotion
-// (o mock oficial do Reanimated nao traz o hook), e continuar passando sem o
-// mock e a prova de que o anel sem `count` nao chama nada de animacao.
+// Estado counting do Ring (DESIGN.md secao 5, F4-21, F4-24).
+//
+// A contagem roda na UI thread (Reanimated), e o Jest nao anima. Por isso
+// nenhum teste aqui afirma quadro intermediario: a curva no instante t e
+// provada em funcao pura (__tests__/features/chapter-complete/countFrame.test.tsx).
+// Aqui se prova a ligacao: o que o Ring pede ao Reanimated, quando avisa o fim,
+// e o que desenha nas bordas de cada trecho.
+//
+// Duas sobrescritas do mock oficial, so nesta camada: o shared value persiste
+// entre renders, como no aparelho (o oficial recria a cada render, e nenhum
+// estado entre trechos seria observavel), e o withTiming nao conclui sozinho:
+// o teste decide quando cada trecho acaba.
 let mockReducedMotion = false;
+type MockAnimacao = { para: number; config: unknown; aoAcabar?: (acabou: boolean) => void };
+const mockAnimacoes: MockAnimacao[] = [];
+const mockCurva = { curva: 'montada dos pontos do token' };
+const mockBezier = jest.fn((..._pontos: number[]) => mockCurva);
+const mockCancelar = jest.fn();
+
 jest.mock('react-native-reanimated', () => {
   const real = jest.requireActual('react-native-reanimated/mock');
-  return { ...real, useReducedMotion: () => mockReducedMotion };
+  const { useRef } = jest.requireActual('react');
+  return {
+    ...real,
+    useReducedMotion: () => mockReducedMotion,
+    useSharedValue: (inicial: unknown) => useRef({ value: inicial }).current,
+    withTiming: (para: number, config: unknown, aoAcabar?: (acabou: boolean) => void) => {
+      mockAnimacoes.push({ para, config, aoAcabar });
+      return para;
+    },
+    cancelAnimation: (...args: unknown[]) => mockCancelar(...args),
+    Easing: { ...real.Easing, bezier: (...pontos: number[]) => mockBezier(...pontos) },
+  };
 });
 
-import { Ring, type RingFrame } from '../../src/ui/Ring';
+import { Ring, useRingCount } from '../../src/ui/Ring';
 import { motion } from '../../src/theme/tokens';
 
-const DURACAO = motion.count.duration;
-const METADE = DURACAO / 2;
-// Um quadro de folga: a contagem anda em requestAnimationFrame (16 ms), entao
-// o ultimo quadro pode cair logo depois dos 600 ms.
-const FOLGA = 20;
+type Tela = ReturnType<typeof render>;
 
-// Mesma leitura de Progress.test.tsx: o Circle normaliza o dasharray para
-// array de strings antes de expor a prop.
-function lerDasharray(valor: unknown): [number, number] {
-  const partes = Array.isArray(valor) ? valor : String(valor).trim().split(/[\s,]+/);
-  return [Number(partes[0]), Number(partes[1])];
+/** A fracao desenhada: dasharray fixo na circunferencia, offset e o que falta. */
+function arco(tela: Tela): number {
+  const circulo = tela.UNSAFE_getAllByType(Circle).find((c) => c.props.testID === 'ring-progress');
+  if (!circulo) throw new Error('arco nao encontrado');
+  const total = Number(circulo.props.strokeDasharray[0]);
+  return 1 - Number(circulo.props.animatedProps.strokeDashoffset) / total;
 }
 
-function arco(getByTestId: (id: string) => { props: { strokeDasharray?: unknown } }): number {
-  const [preenchido, total] = lerDasharray(getByTestId('ring-progress').props.strokeDasharray);
-  return preenchido / total;
+const montagens = jest.fn();
+
+/** Conteudo central de mentira: le a fracao da contagem e conta as montagens. */
+function Sonda() {
+  const fracao = useRingCount();
+  useEffect(() => {
+    montagens();
+  }, []);
+  return <RNText>{`fração ${fracao.value}`}</RNText>;
 }
 
-function anunciado(getByLabelText: (l: string) => { props: { accessibilityValue?: { now?: number } } }, label: string) {
-  return getByLabelText(label).props.accessibilityValue?.now;
+async function concluir(indice: number, acabou = true) {
+  await act(async () => {
+    mockAnimacoes[indice].aoAcabar?.(acabou);
+  });
 }
 
-/** Filho em render prop que grava cada quadro que o anel desenhou. */
-function gravador() {
-  const quadros: RingFrame[] = [];
-  const filho = (q: RingFrame) => {
-    quadros.push(q);
-    return <RNText>{`fração ${q.fraction.toFixed(2)}`}</RNText>;
-  };
-  return { quadros, filho };
-}
-
-describe('Ring: estado counting (DESIGN.md secao 5, F4-21)', () => {
+describe('Ring: estado counting na UI thread (DESIGN.md secao 5, F4-24)', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     mockReducedMotion = false;
+    mockAnimacoes.length = 0;
+    mockBezier.mockClear();
+    mockCancelar.mockClear();
+    montagens.mockClear();
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it('sem count, o anel e estatico: nasce no valor e nao agenda quadro nenhum', () => {
-    const { quadros, filho } = gravador();
-    const { getByTestId } = render(
-      <Ring progress={0.5} size={100} accessibilityLabel="Nível 4">{filho}</Ring>,
+  it('sem count: estatico no valor, sem withTiming, e o centro le a fracao cheia', () => {
+    const tela = render(
+      <Ring progress={0.5} size={100} accessibilityLabel="Nível 4"><Sonda /></Ring>,
     );
-    expect(arco(getByTestId)).toBeCloseTo(0.5, 3);
-    expect(jest.getTimerCount()).toBe(0);
-
-    act(() => {
-      jest.advanceTimersByTime(DURACAO + FOLGA);
-    });
-    expect(arco(getByTestId)).toBeCloseTo(0.5, 3);
-    // Fora da contagem o quadro e o proprio valor, com a fracao cheia. O
-    // length antes do every: every de lista vazia passa sozinho.
-    expect(quadros.length).toBeGreaterThan(0);
-    expect(quadros.every((q) => q.progress === 0.5 && q.fraction === 1)).toBe(true);
+    expect(arco(tela)).toBeCloseTo(0.5, 5);
+    expect(mockAnimacoes).toHaveLength(0);
+    expect(tela.getByText('fração 1')).toBeTruthy();
   });
 
-  it('com count, sai de from, passa por valor intermediario em ease-out e para no progress', () => {
+  it('com count: pede withTiming ate 1 com a duracao e a curva do token, e sai do from', () => {
+    const tela = render(
+      <Ring progress={0.8} size={100} accessibilityLabel="Nível 4" count={{ id: 0, from: 0.2 }}>
+        <Sonda />
+      </Ring>,
+    );
+    expect(mockAnimacoes).toHaveLength(1);
+    expect(mockAnimacoes[0].para).toBe(1);
+    expect(mockAnimacoes[0].config).toEqual({ duration: motion.count.duration, easing: mockCurva });
+    expect((mockAnimacoes[0].config as { easing: unknown }).easing).toBe(mockCurva);
+    expect(mockBezier).toHaveBeenCalledWith(...motion.count.easing);
+    expect(arco(tela)).toBeCloseTo(0.2, 5);
+    expect(tela.getByText('fração 0')).toBeTruthy();
+  });
+
+  it('avisa o fim quando a animacao conclui, uma vez, e nao antes', async () => {
     const onEnd = jest.fn();
-    const { getByTestId } = render(
-      <Ring progress={0.8} size={100} accessibilityLabel="Nível 4" count={{ from: 0.2, onEnd }} />,
-    );
-    expect(arco(getByTestId)).toBeCloseTo(0.2, 3);
-
-    act(() => {
-      jest.advanceTimersByTime(METADE);
-    });
-    const meio = arco(getByTestId);
-    // Ease-out: na metade do tempo ja passou da metade do caminho (0,5). Linear
-    // daria no maximo 0,5; salto direto daria 0,8.
-    expect(meio).toBeGreaterThan(0.2 + 0.6 * 0.5);
-    expect(meio).toBeLessThan(0.79);
+    render(<Ring progress={0.8} size={100} accessibilityLabel="X" count={{ id: 0, from: 0.2, onEnd }} />);
+    await act(async () => {});
     expect(onEnd).not.toHaveBeenCalled();
 
-    // Ainda contando um pouco antes do fim: a duracao e a do token.
-    act(() => {
-      jest.advanceTimersByTime(METADE - 50);
-    });
-    expect(arco(getByTestId)).toBeLessThan(0.8);
-    expect(onEnd).not.toHaveBeenCalled();
-
-    act(() => {
-      jest.advanceTimersByTime(50 + FOLGA);
-    });
-    expect(arco(getByTestId)).toBeCloseTo(0.8, 3);
+    await concluir(0);
     expect(onEnd).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      jest.advanceTimersByTime(1000);
-    });
-    expect(onEnd).toHaveBeenCalledTimes(1);
-    expect(jest.getTimerCount()).toBe(0);
   });
 
-  it('o render prop recebe a fracao andando junto com o arco', () => {
-    const { quadros, filho } = gravador();
-    render(
-      <Ring progress={1} size={100} accessibilityLabel="Nível 4" count={{ from: 0 }}>{filho}</Ring>,
+  it('o leitor de tela ouve o valor final, mesmo com `to` diferente de `progress`', async () => {
+    const tela = render(
+      <Ring progress={0.3} size={100} accessibilityLabel="Nível 5" count={{ id: 0, from: 0.9, to: 1 }} />,
     );
-    expect(quadros[quadros.length - 1]).toEqual({ progress: 0, fraction: 0 });
+    expect(arco(tela)).toBeCloseTo(0.9, 5);
+    expect(tela.getByLabelText('Nível 5').props.accessibilityValue).toEqual({ min: 0, max: 100, now: 30 });
 
-    act(() => {
-      jest.advanceTimersByTime(METADE);
-    });
-    const meio = quadros[quadros.length - 1];
-    expect(meio.fraction).toBeGreaterThan(0);
-    expect(meio.fraction).toBeLessThan(1);
-    expect(meio.progress).toBeCloseTo(meio.fraction, 5);
-
-    act(() => {
-      jest.advanceTimersByTime(METADE + FOLGA);
-    });
-    expect(quadros[quadros.length - 1]).toEqual({ progress: 1, fraction: 1 });
+    await concluir(0);
+    expect(tela.getByLabelText('Nível 5').props.accessibilityValue.now).toBe(30);
   });
 
-  it('o leitor de tela ouve o valor final durante a contagem inteira, nao o intermediario', () => {
-    const { getByTestId, getByLabelText } = render(
-      <Ring progress={0.3} size={100} accessibilityLabel="Nível 5" count={{ from: 0.9, to: 1 }} />,
+  it('mesma arvore com e sem contagem: nada remonta quando a contagem acaba ou recomeca', () => {
+    const tela = render(
+      <Ring progress={0.8} size={100} accessibilityLabel="Nível 4" count={{ id: 0, from: 0.2 }}>
+        <Sonda />
+      </Ring>,
     );
-    expect(anunciado(getByLabelText, 'Nível 5')).toBe(30);
+    const no = tela.getByRole('progressbar');
 
-    act(() => {
-      jest.advanceTimersByTime(METADE);
-    });
-    expect(arco(getByTestId)).toBeGreaterThan(0.9);
-    expect(anunciado(getByLabelText, 'Nível 5')).toBe(30);
+    tela.rerender(<Ring progress={0.8} size={100} accessibilityLabel="Nível 4"><Sonda /></Ring>);
+    expect(montagens).toHaveBeenCalledTimes(1);
+    expect(tela.getByRole('progressbar')).toBe(no);
+    expect(arco(tela)).toBeCloseTo(0.8, 5);
 
-    act(() => {
-      jest.advanceTimersByTime(METADE + FOLGA);
-    });
-    // `to` e onde este trecho para; `progress` e o que o leitor de tela ouve.
-    expect(arco(getByTestId)).toBeCloseTo(1, 3);
-    expect(anunciado(getByLabelText, 'Nível 5')).toBe(30);
+    tela.rerender(
+      <Ring progress={0.8} size={100} accessibilityLabel="Nível 4" count={{ id: 1, from: 0 }}>
+        <Sonda />
+      </Ring>,
+    );
+    expect(montagens).toHaveBeenCalledTimes(1);
+    expect(tela.getByRole('progressbar')).toBe(no);
   });
 
-  it('um trecho novo recomeca do from, sem nenhum quadro repetindo o fim do trecho anterior', () => {
+  it('dois trechos seguidos com os mesmos valores e outro id: o segundo tambem conta e avisa o fim (F4-25)', async () => {
     const primeiro = jest.fn();
     const segundo = jest.fn();
-    const { quadros, filho } = gravador();
-    const { getByTestId, rerender } = render(
-      <Ring progress={0.3} size={100} accessibilityLabel="X" count={{ from: 0.9, to: 1, onEnd: primeiro }}>
-        {filho}
-      </Ring>,
+    const tela = render(
+      <Ring progress={1} size={100} accessibilityLabel="X" count={{ id: 0, from: 0, to: 1, onEnd: primeiro }} />,
     );
-    act(() => {
-      jest.advanceTimersByTime(DURACAO + FOLGA);
-    });
-    expect(arco(getByTestId)).toBeCloseTo(1, 3);
+    await concluir(0);
     expect(primeiro).toHaveBeenCalledTimes(1);
 
-    const desde = quadros.length;
-    rerender(
-      <Ring progress={0.3} size={100} accessibilityLabel="X" count={{ from: 0, onEnd: segundo }}>
-        {filho}
-      </Ring>,
+    tela.rerender(
+      <Ring progress={1} size={100} accessibilityLabel="X" count={{ id: 1, from: 0, to: 1, onEnd: segundo }} />,
     );
-    expect(arco(getByTestId)).toBeCloseTo(0, 3);
-    // Sem isto, o primeiro render do trecho novo ainda usaria a fracao cheia
-    // do trecho velho e desenharia o fim (0,3) antes de voltar ao zero.
-    expect(quadros.slice(desde).length).toBeGreaterThan(0);
-    expect(quadros.slice(desde).every((q) => q.fraction === 0 && q.progress === 0)).toBe(true);
+    expect(mockAnimacoes).toHaveLength(2);
 
-    act(() => {
-      jest.advanceTimersByTime(METADE);
-    });
-    expect(arco(getByTestId)).toBeGreaterThan(0);
-    expect(arco(getByTestId)).toBeLessThan(0.3);
-
-    act(() => {
-      jest.advanceTimersByTime(METADE + FOLGA);
-    });
-    expect(arco(getByTestId)).toBeCloseTo(0.3, 3);
+    await concluir(1);
     expect(segundo).toHaveBeenCalledTimes(1);
     expect(primeiro).toHaveBeenCalledTimes(1);
   });
 
-  it('trocar so o onEnd no meio nao reinicia a contagem, e o fim chama o onEnd mais novo', () => {
+  it('trecho novo comeca no from dele, e nao no fim do trecho anterior', async () => {
+    const tela = render(
+      <Ring progress={0.3} size={100} accessibilityLabel="X" count={{ id: 0, from: 0.9, to: 1 }}>
+        <Sonda />
+      </Ring>,
+    );
+    await concluir(0);
+
+    // Neste render o shared value ainda esta no fim do trecho anterior.
+    tela.rerender(
+      <Ring progress={0.3} size={100} accessibilityLabel="X" count={{ id: 1, from: 0 }}>
+        <Sonda />
+      </Ring>,
+    );
+    expect(arco(tela)).toBeCloseTo(0, 5);
+    expect(tela.getByText('fração 0')).toBeTruthy();
+  });
+
+  it('trocar so o onEnd no meio nao reinicia a contagem, e o fim chama o onEnd mais novo', async () => {
     const velho = jest.fn();
     const novo = jest.fn();
-    const { getByTestId, rerender } = render(
-      <Ring progress={0.8} size={100} accessibilityLabel="X" count={{ from: 0.2, onEnd: velho }} />,
+    const tela = render(
+      <Ring progress={0.8} size={100} accessibilityLabel="X" count={{ id: 0, from: 0.2, onEnd: velho }} />,
     );
-    act(() => {
-      jest.advanceTimersByTime(METADE);
-    });
-    const meio = arco(getByTestId);
-    expect(meio).toBeGreaterThan(0.5);
+    tela.rerender(
+      <Ring progress={0.8} size={100} accessibilityLabel="X" count={{ id: 0, from: 0.2, onEnd: novo }} />,
+    );
+    expect(mockAnimacoes).toHaveLength(1);
 
-    rerender(<Ring progress={0.8} size={100} accessibilityLabel="X" count={{ from: 0.2, onEnd: novo }} />);
-    expect(arco(getByTestId)).toBeCloseTo(meio, 5);
-
-    act(() => {
-      jest.advanceTimersByTime(METADE + FOLGA);
-    });
-    expect(arco(getByTestId)).toBeCloseTo(0.8, 3);
+    await concluir(0);
     expect(novo).toHaveBeenCalledTimes(1);
     expect(velho).not.toHaveBeenCalled();
   });
 
-  it('com reduce motion, aparece direto no valor final, sem quadro intermediario, e avisa o fim', () => {
+  it('com reduce motion: nenhum withTiming, valor final direto, e o fim avisado', async () => {
     mockReducedMotion = true;
     const onEnd = jest.fn();
-    const { quadros, filho } = gravador();
-    const { getByTestId } = render(
-      <Ring progress={0.8} size={100} accessibilityLabel="Nível 4" count={{ from: 0.2, onEnd }}>
-        {filho}
+    const tela = render(
+      <Ring progress={0.8} size={100} accessibilityLabel="Nível 4" count={{ id: 0, from: 0.2, onEnd }}>
+        <Sonda />
       </Ring>,
     );
-    expect(arco(getByTestId)).toBeCloseTo(0.8, 3);
-    expect(quadros.length).toBeGreaterThan(0);
-    expect(quadros.every((q) => q.progress === 0.8 && q.fraction === 1)).toBe(true);
-    expect(onEnd).toHaveBeenCalledTimes(1);
-    expect(jest.getTimerCount()).toBe(0);
-
-    act(() => {
-      jest.advanceTimersByTime(METADE);
-    });
-    expect(arco(getByTestId)).toBeCloseTo(0.8, 3);
+    await act(async () => {});
+    expect(mockAnimacoes).toHaveLength(0);
+    expect(arco(tela)).toBeCloseTo(0.8, 5);
+    expect(tela.getByText('fração 1')).toBeTruthy();
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
-  it('desmontar no meio da contagem cancela o quadro e nao avisa fim', () => {
+  it('desmontar no meio cancela a animacao, e a conclusao cancelada nao avisa fim', async () => {
     const onEnd = jest.fn();
-    const { unmount } = render(
-      <Ring progress={0.8} size={100} accessibilityLabel="X" count={{ from: 0.2, onEnd }} />,
+    const tela = render(
+      <Ring progress={0.8} size={100} accessibilityLabel="X" count={{ id: 0, from: 0.2, onEnd }} />,
     );
-    act(() => {
-      jest.advanceTimersByTime(METADE);
-    });
-    unmount();
-    expect(jest.getTimerCount()).toBe(0);
-    act(() => {
-      jest.advanceTimersByTime(DURACAO);
-    });
+    tela.unmount();
+    expect(mockCancelar).toHaveBeenCalledTimes(1);
+
+    await concluir(0, false);
     expect(onEnd).not.toHaveBeenCalled();
   });
 });

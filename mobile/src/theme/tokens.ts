@@ -99,7 +99,10 @@ export const motion = {
   enter: { duration: 240, translateY: 8 },
   exit: { duration: 160 },
   stagger: { step: 40, max: 6 },
-  count: { duration: 600 },
+  // A curva vai como os quatro pontos de controle de uma cubic-bezier (aqui, a
+  // ease-out cúbica), e não como função: tokens.ts não depende do Reanimated.
+  // Quem anima monta Easing.bezier(...motion.count.easing).
+  count: { duration: 600, easing: [0.33, 1, 0.68, 1] },
   skeleton: { duration: 200 },
   // Pulso do Skeleton (opacidade indo e voltando em loop): duração própria,
   // diferente de `skeleton` acima, que é o crossfade de 200ms para o

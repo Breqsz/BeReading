@@ -84,9 +84,18 @@ export function levelFor(xp: number): LevelInfo {
  *
  * Mora aqui, e nao numa feature (F4-22): Hoje, registro e capitulo fechado
  * mostram XP, e tres telas importando de uma delas era import entre features.
+ *
+ * Worklet (F4-24): o XpRing formata o numero na thread de UI, a cada quadro da
+ * contagem. Por isso o agrupamento e um laco simples, e nao regex: roda igual
+ * no JS e no runtime do worklet.
  */
 export function formatXp(n: number): string {
-  const inteiro = Math.round(Math.abs(n));
-  const agrupado = String(inteiro).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  'worklet';
+  const digitos = String(Math.round(Math.abs(n)));
+  let agrupado = '';
+  for (let i = 0; i < digitos.length; i++) {
+    if (i > 0 && (digitos.length - i) % 3 === 0) agrupado += '.';
+    agrupado += digitos[i];
+  }
   return n < 0 ? `-${agrupado}` : agrupado;
 }

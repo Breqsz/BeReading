@@ -1,38 +1,39 @@
 import { render } from '@testing-library/react-native';
 import { Text as RNText } from 'react-native';
+import { Circle } from 'react-native-svg';
 import { Ring } from '../../src/ui/Ring';
 import { ProgressBar } from '../../src/ui/ProgressBar';
 
-// O Circle do react-native-svg normaliza strokeDasharray para um array de
-// strings numericas antes de expor a prop (nao devolve o "a b" que passamos).
-// Um split(' ') ingenuo daria sempre NaN aqui; isto le os dois valores
-// independente do formato devolvido pela versao instalada da lib.
-function lerDasharray(valor: unknown): [number, number] {
-  const partes = Array.isArray(valor) ? valor : String(valor).trim().split(/[\s,]+/);
-  return [Number(partes[0]), Number(partes[1])];
+// O arco anda por strokeDashoffset num Circle animado (F4-24): o dasharray fica
+// fixo na circunferencia, e o offset diz quanto falta desenhar. No Jest, o
+// createAnimatedComponent do mock devolve o proprio Circle, e o valor que a UI
+// thread aplicaria chega em `animatedProps`. Isto le dali a fracao desenhada.
+function arcoDesenhado(tela: ReturnType<typeof render>): number {
+  const circulo = tela.UNSAFE_getAllByType(Circle).find((c) => c.props.testID === 'ring-progress');
+  if (!circulo) throw new Error('arco nao encontrado');
+  const total = Number(circulo.props.strokeDasharray[0]);
+  return 1 - Number(circulo.props.animatedProps.strokeDashoffset) / total;
 }
 
 describe('Ring', () => {
   it('desenha o arco proporcional ao progresso', () => {
-    const { getByTestId } = render(<Ring progress={0.5} size={100} accessibilityLabel="Nível 4" />);
-    const [preenchido, total] = lerDasharray(getByTestId('ring-progress').props.strokeDasharray);
-    expect(preenchido / total).toBeCloseTo(0.5, 2);
+    const tela = render(<Ring progress={0.5} size={100} accessibilityLabel="Nível 4" />);
+    expect(arcoDesenhado(tela)).toBeCloseTo(0.5, 2);
   });
 
   it('progresso 0 nao desenha arco', () => {
-    const { getByTestId } = render(<Ring progress={0} size={100} accessibilityLabel="Nível 1" />);
-    expect(lerDasharray(getByTestId('ring-progress').props.strokeDasharray)[0]).toBe(0);
+    const tela = render(<Ring progress={0} size={100} accessibilityLabel="Nível 1" />);
+    expect(arcoDesenhado(tela)).toBeCloseTo(0, 5);
   });
 
   it('progresso acima de 1 satura, em vez de dar a volta', () => {
-    const { getByTestId } = render(<Ring progress={1.4} size={100} accessibilityLabel="Topo" />);
-    const [preenchido, total] = lerDasharray(getByTestId('ring-progress').props.strokeDasharray);
-    expect(preenchido).toBeCloseTo(total, 1);
+    const tela = render(<Ring progress={1.4} size={100} accessibilityLabel="Topo" />);
+    expect(arcoDesenhado(tela)).toBeCloseTo(1, 5);
   });
 
   it('valor invalido nao quebra: trata como zero', () => {
-    const { getByTestId } = render(<Ring progress={Number.NaN} size={100} accessibilityLabel="X" />);
-    expect(lerDasharray(getByTestId('ring-progress').props.strokeDasharray)[0]).toBe(0);
+    const tela = render(<Ring progress={Number.NaN} size={100} accessibilityLabel="X" />);
+    expect(arcoDesenhado(tela)).toBeCloseTo(0, 5);
   });
 
   it('anuncia o progresso para o leitor de tela', () => {

@@ -142,22 +142,35 @@ export function xpPlan({ xpBefore, gained, storeXp, storeLevel, loaded }: XpPlan
 
   // Subiu: completa ate o limiar do nivel de antes, zera e continua ate o
   // progresso do nivel novo. Subindo dois niveis de uma vez, continua sendo uma
-  // volta so, e o XP do segundo trecho sai do limiar em que o primeiro parou,
-  // para o numero nao saltar.
-  const limiar = antes.next;
+  // volta so (F4-25). O XP do segundo trecho sai do piso do nivel novo, e nao do
+  // limiar de antes: o centro ja mostra o nivel novo, e contar do limiar poria o
+  // numero abaixo do piso dele. O numero salta junto com o arco que zera.
+  const primeiro: CountSegment = {
+    fromProgress: antes.progress, toProgress: 1, fromXp: xpBefore, toXp: antes.next, level: antes,
+  };
+  // Alvo exatamente no piso do nivel novo: o segundo trecho teria comprimento
+  // zero. O anel completa e a tela termina direto no nivel novo.
+  if (depois.progress === 0) {
+    return { finalXp: alvo, finalLevel: depois, leveledUp: true, segments: [primeiro] };
+  }
   return {
     finalXp: alvo,
     finalLevel: depois,
     leveledUp: true,
     segments: [
-      { fromProgress: antes.progress, toProgress: 1, fromXp: xpBefore, toXp: limiar, level: antes },
-      { fromProgress: 0, toProgress: depois.progress, fromXp: limiar, toXp: alvo, level: depois },
+      primeiro,
+      { fromProgress: 0, toProgress: depois.progress, fromXp: depois.floor, toXp: alvo, level: depois },
     ],
   };
 }
 
-/** O XP do centro numa fracao do trecho. */
+/**
+ * O XP do centro numa fracao do trecho. Worklet (F4-24): o XpRing chama isto na
+ * thread de UI, a cada quadro da contagem. Sem a diretiva, o aparelho quebra ao
+ * contar, e o Jest nao pega, porque o plugin do Reanimated fica desligado nele.
+ */
 export function xpAt(segment: CountSegment, fraction: number): number {
+  'worklet';
   return Math.round(segment.fromXp + (segment.toXp - segment.fromXp) * fraction);
 }
 

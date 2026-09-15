@@ -56,10 +56,15 @@ export default function ChapterCompleteScreen() {
     };
   }, [ids]);
 
+  // back, nunca replace da pilha: volta pra onde o leitor abriu o registro. Existe
+  // tambem durante o carregamento (F4-26): sair nao depende dos capitulos, e uma
+  // consulta pendurada deixaria o leitor num fullScreenModal sem saida no iOS.
+  const depois = <Button variant="ghost" onPress={() => router.back()}>Depois</Button>;
+
   if (carga.estado === 'carregando') {
     return (
       <Screen edges={['top', 'bottom']} contentStyle={styles.content}>
-        <ChapterCompleteSkeleton />
+        <ChapterCompleteSkeleton>{depois}</ChapterCompleteSkeleton>
       </Screen>
     );
   }
@@ -87,8 +92,7 @@ export default function ChapterCompleteScreen() {
       <View style={chapterCompleteLayout.acoes}>
         {/* replace: a conquista nao fica na pilha atras do quiz. */}
         {quiz ? <Button onPress={() => router.replace(`/quiz/${quiz}`)}>Bora pro quiz</Button> : null}
-        {/* back, nunca replace da pilha: volta pra onde o leitor abriu o registro. */}
-        <Button variant="ghost" onPress={() => router.back()}>Depois</Button>
+        {depois}
       </View>
     </Screen>
   );

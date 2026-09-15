@@ -134,16 +134,45 @@ describe('xpPlan (F4-14)', () => {
     ]);
   });
 
-  it('subiu mais de um nivel de uma vez: uma volta so, e o numero nao salta', () => {
-    // Premissa: 600 e nivel 2 (proximo em 660); 1400 e nivel 4.
+  it('subiu mais de um nivel de uma vez: uma volta so, e o segundo trecho sai do piso do nivel final (F4-25)', () => {
+    // Premissa: 600 e nivel 2 (proximo em 660); 1400 e nivel 4 (piso 1320).
     expect(levelFor(600)).toMatchObject({ level: 2, next: 660 });
-    expect(levelFor(1400).level).toBe(4);
+    expect(levelFor(1400)).toMatchObject({ level: 4, floor: 1320 });
 
     const plan = xpPlan({ xpBefore: 600, gained: 800, ...carregado(1400) });
     expect(plan?.segments).toHaveLength(2);
     expect(plan?.segments[0]).toMatchObject({ fromXp: 600, toXp: 660, toProgress: 1 });
-    expect(plan?.segments[1]).toMatchObject({ fromXp: 660, toXp: 1400, fromProgress: 0 });
+    // O centro mostra o nivel 4 no segundo trecho: contar de 660 poria o numero
+    // abaixo do piso desse nivel. O numero salta junto com o arco que zera.
+    expect(plan?.segments[1]).toMatchObject({ fromXp: 1320, toXp: 1400, fromProgress: 0 });
     expect(plan?.segments[1].level.level).toBe(4);
+  });
+
+  it('o caso da revisao: de 0 a 750 XP, o segundo trecho nao mostra XP abaixo do piso do nivel 3', () => {
+    expect(levelFor(750)).toMatchObject({ level: 3, floor: 660, next: 1320 });
+
+    const plan = xpPlan({ xpBefore: 0, gained: 750, ...carregado(750) });
+    expect(plan?.segments[1]).toMatchObject({ fromXp: 660, toXp: 750, level: levelFor(750) });
+  });
+
+  it('alvo exatamente no piso do nivel novo: sem trecho de comprimento zero, termina direto', () => {
+    expect(levelFor(2200)).toMatchObject({ level: 5, floor: 2200, progress: 0 });
+
+    const plan = xpPlan({ xpBefore: 2100, gained: 100, ...carregado(2200) });
+    expect(plan?.leveledUp).toBe(true);
+    expect(plan?.finalLevel).toEqual(levelFor(2200));
+    expect(plan?.segments).toEqual([
+      { fromProgress: levelFor(2100).progress, toProgress: 1, fromXp: 2100, toXp: 2200, level: levelFor(2100) },
+    ]);
+  });
+
+  it('do piso do nivel 7 ao topo: dois trechos com o mesmo arco, que o Ring precisa distinguir (F4-25)', () => {
+    expect(levelFor(4620)).toMatchObject({ level: 7, floor: 4620, progress: 0 });
+    expect(levelFor(6160)).toMatchObject({ level: 8, next: null, progress: 1 });
+
+    const plan = xpPlan({ xpBefore: 4620, gained: 1540, ...carregado(6160) });
+    expect(plan?.leveledUp).toBe(true);
+    expect(plan?.segments.map((s) => [s.fromProgress, s.toProgress])).toEqual([[0, 1], [0, 1]]);
   });
 
   it('sem xpBefore: parado no store, sem trecho e sem subida, mesmo com store menos ganho cruzando nivel', () => {

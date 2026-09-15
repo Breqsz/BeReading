@@ -144,11 +144,14 @@ estado "erro" descrito, por exemplo, ainda entra incompleto.
 - **Ring**: anel de nível. Estados: default (progresso estático até o valor atual); counting
   (`motion.count`, 600 ms, ease-out, só na conquista de nível); reduced motion (aparece direto no
   valor final, sem contagem). Pressionável quando leva a Você: nesse caso segue os estados de
-  pressed do Button. Em código (F4): sem o prop `count`, é o default. Com `count` (`from`, `to`
-  opcional, `onEnd`), o arco anda de `from` até `to` (padrão: `progress`); o conteúdo central
-  passado como função recebe o quadro atual (`progress` e `fraction`) e conta junto com o arco. O
-  leitor de tela ouve sempre `progress`, o valor final, nunca o intermediário. Um trecho por vez: a
-  subida de nível (completa, zera, continua) é sequência de quem usa, trecho a trecho, pelo `onEnd`.
+  pressed do Button. Em código (F4): sem o prop `count`, é o default. Com `count` (`id`, `from`,
+  `to` opcional, `onEnd`), o arco anda de `from` até `to` (padrão: `progress`) na thread de UI, por
+  shared value, sem render por quadro. Trocar o `id` recomeça a contagem mesmo com os mesmos valores
+  (dois trechos de 0 a 1 são dois trechos). O conteúdo central conta junto lendo a fração com
+  `useRingCount()`; toda função chamada dentro dessa leitura precisa ser `'worklet'` (`xpAt`,
+  `formatXp`), e o Jest não pega a falta. O leitor de tela ouve sempre `progress`, o valor final,
+  nunca o intermediário. Um trecho por vez: a subida de nível (completa, zera, continua) é
+  sequência de quem usa, trecho a trecho, pelo `onEnd`.
 - **ProgressBar**: barra linear (progresso de capítulo, resumo de registro). Estados: default;
   updating (anima até o novo valor com `motion.count` quando o valor muda por uma ação do usuário,
   sem animar em carregamento inicial). Não existe estado "complete": em 100% o preenchimento

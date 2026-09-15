@@ -31,9 +31,10 @@ jest.mock('react-native-reanimated', () => {
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
+let mockCanGoBack = true;
 let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, back: mockBack, push: jest.fn() }),
+  useRouter: () => ({ replace: mockReplace, back: mockBack, push: jest.fn(), canGoBack: () => mockCanGoBack }),
   useLocalSearchParams: () => mockParams,
 }));
 
@@ -479,5 +480,33 @@ describe('capitulo fechado: cota de quiz do plano gratuito (BER-58)', () => {
       liberarPlano(null);
     });
     expect(tela.getByRole('button', { name: 'Bora pro quiz' })).toBeTruthy();
+  });
+});
+
+describe('capitulo fechado aberto como primeira tela (R2, 15/09)', () => {
+  afterEach(() => {
+    mockCanGoBack = true;
+  });
+
+  it('"Depois" sem tela atras vai para a Hoje, em vez de GO_BACK sem destino', async () => {
+    mockCanGoBack = false;
+    registro();
+    storeCom(1840);
+    mGetChapters.mockResolvedValue([capitulo('c-4', 4)]);
+    const tela = await montar();
+
+    fireEvent.press(tela.getByRole('button', { name: 'Depois' }));
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+
+  it('"Depois" com tela atras continua voltando', async () => {
+    registro();
+    storeCom(1840);
+    mGetChapters.mockResolvedValue([capitulo('c-4', 4)]);
+    const tela = await montar();
+
+    fireEvent.press(tela.getByRole('button', { name: 'Depois' }));
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

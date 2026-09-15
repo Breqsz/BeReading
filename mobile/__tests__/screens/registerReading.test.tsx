@@ -11,12 +11,14 @@ jest.mock('react-native-reanimated', () => {
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+// false simula o sheet aberto como primeira tela (link direto, recarregamento).
+let mockCanGoBack = true;
 let mockParams: { bookId?: string } = {};
 // Opcoes que a tela passa para a propria rota via <Stack.Screen options>, na
 // ordem de render: a ultima e a que vale.
 const mockStackOptions: { gestureEnabled?: boolean }[] = [];
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, back: mockBack, push: mockPush }),
+  useRouter: () => ({ replace: mockReplace, back: mockBack, push: mockPush, canGoBack: () => mockCanGoBack }),
   useLocalSearchParams: () => mockParams,
   Stack: {
     Screen: ({ options }: { options?: { gestureEnabled?: boolean } }) => {
@@ -121,6 +123,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockParams = {};
   mockCurrentBook = null;
+  mockCanGoBack = true;
   mockStackOptions.length = 0;
 
   mGetStudentBooks.mockReset();
@@ -351,6 +354,33 @@ describe('registrar leitura: resultado', () => {
 
     fireEvent.press(getByRole('button', { name: /Conhecer o Premium/ }));
     expect(mockPush).toHaveBeenCalledWith('/planos');
+  });
+
+  it('aberto como primeira tela: sem capitulo fechado, vai para a Hoje em vez de GO_BACK sem destino (R2)', async () => {
+    mockCanGoBack = false;
+    mRegister.mockResolvedValue(resposta({ completed_chapter_ids: [] }));
+
+    const { getByLabelText, getByRole, findByText } = await abrir();
+    fireEvent.changeText(getByLabelText('Página final'), '96');
+    fireEvent.press(getByRole('button', { name: 'Registrar 12 páginas' }));
+
+    expect(await findByText('12 páginas registradas')).toBeTruthy();
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+
+  it('aberto como primeira tela: tem "Voltar" para sair, que leva para a Hoje (R2)', async () => {
+    mockCanGoBack = false;
+    const { getByRole } = await abrir();
+
+    fireEvent.press(getByRole('button', { name: 'Voltar' }));
+    expect(mockReplace).toHaveBeenCalledWith('/');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('aberto por cima da Hoje (sheet), nao mostra "Voltar": o sheet fecha pelo gesto', async () => {
+    const { queryByRole } = await abrir();
+    expect(queryByRole('button', { name: 'Voltar' })).toBeNull();
   });
 
   it('sem capitulo fechado: espera o refresh, fecha o sheet e mostra toast com paginas, XP e sequencia', async () => {

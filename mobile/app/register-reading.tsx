@@ -19,6 +19,7 @@ import { registerReadingSession, type RegisterReadingResponse } from '../src/api
 import { getBookWithChapters, getStudentBooks } from '../src/api/queries';
 import { pickInitialBook, toChoices, type BookChoice } from '../src/utils/registerReading';
 import { isQuotaExceededError, paywallCopy } from '../src/utils/billing';
+import { backOrHome } from '../src/utils/navigation';
 import { Banner, Button, EmptyState, Screen, Text, useToast } from '../src/ui';
 import { space } from '../src/theme/tokens';
 import {
@@ -58,6 +59,13 @@ export default function RegisterReadingScreen() {
   const [sending, setSending] = useState(false);
 
   const userId = profile?.user_id ?? null;
+
+  // O sheet foi pensado para abrir por cima da Hoje. Aberto como primeira tela
+  // (link direto, recarregamento), ele e tela cheia: precisa da margem da barra
+  // de status e de um jeito de sair, senao o leitor fica preso (R2, 15/09).
+  const raiz = !router.canGoBack();
+  const bordas: ('top' | 'bottom')[] = raiz ? ['top', 'bottom'] : ['bottom'];
+  const fechar = raiz && !sending ? () => router.replace('/') : undefined;
 
   // BER-44: sem a lista, o sheet ainda oferece o livro que a Hoje tinha aberto.
   // Lido por ref para uma mudanca no store nao refazer a busca e apagar o que ja
@@ -260,7 +268,9 @@ export default function RegisterReadingScreen() {
     }
 
     toast.show(confirmacao);
-    router.back();
+    // Sem tela atras (link direto, recarregamento), vai para a Hoje: `back()`
+    // sem destino deixava o sheet preso no estado de envio (R2, 15/09).
+    backOrHome(router);
   }
 
   const enviarAtual = useRef(enviar);
@@ -268,7 +278,7 @@ export default function RegisterReadingScreen() {
 
   if (loadingBooks) {
     return (
-      <Screen scroll={false} edges={['bottom']} contentStyle={styles.content}>
+      <Screen scroll={false} edges={bordas} onBack={fechar} contentStyle={styles.content}>
         <RegisterSkeleton />
       </Screen>
     );
@@ -276,7 +286,7 @@ export default function RegisterReadingScreen() {
 
   if (loadError) {
     return (
-      <Screen scroll={false} edges={['bottom']} contentStyle={styles.content}>
+      <Screen scroll={false} edges={bordas} onBack={fechar} contentStyle={styles.content}>
         <Banner
           tone="danger"
           message="Não deu pra carregar seus livros."
@@ -288,7 +298,7 @@ export default function RegisterReadingScreen() {
 
   if (!selected || !resumo) {
     return (
-      <Screen scroll={false} edges={['bottom']} contentStyle={styles.content}>
+      <Screen scroll={false} edges={bordas} onBack={fechar} contentStyle={styles.content}>
         <EmptyState
           title="Nada em leitura, por enquanto."
           description="Escolhe um livro no catálogo pra começar a registrar."
@@ -327,7 +337,7 @@ export default function RegisterReadingScreen() {
   // registro fica tocavel. A opcao e passada daqui, pela propria rota, sem
   // tocar em app/_layout.tsx.
   return (
-    <Screen scroll={false} edges={['bottom']} contentStyle={styles.content}>
+    <Screen scroll={false} edges={bordas} onBack={fechar} contentStyle={styles.content}>
       <Stack.Screen options={{ gestureEnabled: !sending }} />
       <KeyboardAvoidingView
         style={styles.flex}

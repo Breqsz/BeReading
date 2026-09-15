@@ -14,6 +14,7 @@ import { useEntitlementStore } from '../src/stores/entitlementStore';
 import { getChaptersByIds } from '../src/api/queries';
 import { quizInviteLine } from '../src/assistant/lines';
 import { Button, Screen } from '../src/ui';
+import { backOrHome } from '../src/utils/navigation';
 import {
   ChapterCompleteSkeleton, ClosedChapterHeader, GainTags, XpRing, chapterCompleteLayout,
   chapterTargets, closedTitle, parseParams, quizCta, streakTagLabel, xpGained, xpPlan, xpTagLabel,
@@ -66,7 +67,9 @@ export default function ChapterCompleteScreen() {
   // back, nunca replace da pilha: volta pra onde o leitor abriu o registro. Existe
   // tambem durante o carregamento (F4-26): sair nao depende dos capitulos, e uma
   // consulta pendurada deixaria o leitor num fullScreenModal sem saida no iOS.
-  const depois = <Button variant="ghost" onPress={() => router.back()}>Depois</Button>;
+  // Sem tela atras (link direto, recarregamento), vai para a Hoje: `back()` sem
+  // destino deixaria o leitor preso na conquista (R2, 15/09).
+  const depois = <Button variant="ghost" onPress={() => backOrHome(router)}>Depois</Button>;
 
   if (carga.estado === 'carregando') {
     return (
